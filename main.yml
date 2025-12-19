@@ -2,8 +2,8 @@ name: MainFrame Cron Job
 
 on:
   #schedule:
-    # Runs every 10 minutes
-    #- cron: '*/10 * * * *'
+     Runs every 10 minutes
+    - cron: '*/10 * * * *'
   workflow_dispatch: # Allows manual run button
 
 jobs:
@@ -32,4 +32,5 @@ jobs:
 
     - name: Run MainFrame
       # 🚨 UPDATE: Run main.py, NOT MainFrame_GitHub_Edition.py
+
       run: python -u main.py
