@@ -1,0 +1,36 @@
+name: MainFrame Cron Job
+
+on:
+  #schedule:
+     Runs every 10 minutes
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # Allows manual run button
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    # 🚨 SAFETY NET: Kills the job if it runs longer than 2 minutes
+    timeout-minutes: 2
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        ref: main # ⚠️ Make sure this matches the branch you uploaded files to!
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Debug File Structure
+      run: ls -R # This will print all files so we can see where they are if it fails again
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Run MainFrame
+      # 🚨 UPDATE: Run main.py, NOT MainFrame_GitHub_Edition.py
+
+      run: python -u main.py
