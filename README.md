@@ -1,6 +1,6 @@
-🐙 Money Maker (MainFrame V3.0)
+**🐙 Money Maker (MainFrame V3.0)**
 
-"From Trade Executioner to Cloud Accountant."
+> "From Trade Executioner to Cloud Accountant."
 
 Money Maker is a modular, cloud-native trading bot designed to run autonomously on GitHub Actions. It has evolved from a Windows-dependent script to a robust, API-first system that tracks trades, manages risk, and logs everything to the cloud.
 
@@ -48,4 +48,4 @@ Add your ImgBB API Key to config.py.
 
 Push to main branch to activate the workflow.
 
-⚠️ Warning: This bot is designed for educational purposes. Use at your own risk.
+⚠️ Warning: This bot is designed for educational and simulation purposes. Use at your own risk with real funds.
