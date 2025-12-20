@@ -34,8 +34,39 @@ def calc_indicators(df, params):
     return df
 
 def calc_adx(df, params):
-    # Simplified ADX calc for regime filter
-    return df # Placeholder if actual ADX logic is missing in snippet
+    """Calculates ADX (Average Directional Index) for Regime Filter."""
+    if df.empty: return df
+    
+    n = params.get('REGIME_ADX_PERIOD', 14)
+    
+    # 1. True Range (TR)
+    df['tr0'] = abs(df['high'] - df['low'])
+    df['tr1'] = abs(df['high'] - df['close'].shift(1))
+    df['tr2'] = abs(df['low'] - df['close'].shift(1))
+    df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
+    
+    # 2. Directional Movement (+DM, -DM)
+    df['up'] = df['high'] - df['high'].shift(1)
+    df['down'] = df['low'].shift(1) - df['low']
+    
+    df['pdm'] = np.where((df['up'] > df['down']) & (df['up'] > 0), df['up'], 0.0)
+    df['mdm'] = np.where((df['down'] > df['up']) & (df['down'] > 0), df['down'], 0.0)
+    
+    # 3. Smoothing (Using EMA as approximation for Wilder's)
+    # Wilder's Smoothing implies alpha = 1/n
+    df['tr_s'] = df['tr'].ewm(alpha=1/n, adjust=False).mean()
+    df['pdm_s'] = df['pdm'].ewm(alpha=1/n, adjust=False).mean()
+    df['mdm_s'] = df['mdm'].ewm(alpha=1/n, adjust=False).mean()
+    
+    # 4. Directional Indexes (+DI, -DI)
+    df['pdi'] = 100 * (df['pdm_s'] / df['tr_s'])
+    df['mdi'] = 100 * (df['mdm_s'] / df['tr_s'])
+    
+    # 5. DX and ADX
+    df['dx'] = 100 * abs(df['pdi'] - df['mdi']) / (df['pdi'] + df['mdi']).replace(0, 1)
+    df['adx'] = df['dx'].ewm(alpha=1/n, adjust=False).mean()
+    
+    return df
 
 def check_sr_trend(pair, df_m1, df_m5, broker, params):
     # Logic for trend trading
@@ -65,13 +96,19 @@ def generate_signal(pair, broker, cloud):
         df_m15 = broker.fetch_candles(pair, '15m', 50)
         if df_m15.empty: return None, None, None, None
         
+        # 🛠️ FIX: Actually calculate ADX now
         df_m15 = calc_adx(df_m15, params)
-        adx = df_m15['adx'].iloc[-1] if not df_m15.empty else 0
+        adx = df_m15['adx'].iloc[-1] if not df_m15.empty and 'adx' in df_m15.columns else 0
         
         # TRENDING REGIME
         if adx >= params['REGIME_ADX_THRESHOLD']:
             # Check SR_TREND
             df_m1 = broker.fetch_candles(pair, '1m', params['CANDLE_COUNT'])
+            if df_m1.empty: return None, None, None, None
+            
+            # 🛠️ FIX: Calculate indicators for M1 data so 'bb_std' exists!
+            df_m1 = calc_indicators(df_m1, params)
+
             res = check_sr_trend(pair, df_m1, df_m5, broker, params)
             if res: return res
             
