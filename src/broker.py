@@ -32,23 +32,28 @@ class BrokerAPI:
                 last_price = df['Close'].iloc[-1]
                 # Simulating spread since YF gives mid-price mostly
                 spread = 0.0002 if 'X' in symbol else 1.0 
-                return type('Tick', (object,), {'bid': last_price, 'ask': last_price + spread})
+                return type('Tick', (object,), {'bid': last_price, 'ask': last_price + spread, 'time': datetime.now()})
+            
+            # 🚨 FIX: Return None if data is empty (Market Closed/Error)
+            # Do NOT return 0, or the bot will close all trades at $0!
             return None
+            
         except:
             return None
 
     def fetch_candles(self, pair, timeframe, count):
-        # Map timeframe to YFinance interval
-        interval_map = {'1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '1d': '1d'}
-        yf_interval = interval_map.get(timeframe, '1h')
-        
-        # Adjust period based on count/interval to ensure we get enough data
-        period = "1d"
-        if timeframe == '5m': period = "5d"
-        if timeframe == '15m': period = "5d"
-        if timeframe == '1m': period = "1d"
-        
         symbol = self._map_symbol(pair)
+        
+        # Map timeframe to YF interval
+        interval_map = {
+            '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
+            '1h': '1h', '4h': '1h', '1d': '1d'
+        }
+        yf_interval = interval_map.get(timeframe, '1m')
+        
+        # Adjust period based on count required
+        period = "1d"
+        if timeframe in ['1h', '4h']: period = "5d"
         
         try:
             ticker = yf.Ticker(symbol)
