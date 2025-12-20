@@ -2,8 +2,9 @@ name: MainFrame Cron Job
 
 on:
   schedule:
-    # Runs every 10 minutes
-    - cron: '*/8 * * * *'
+    # Runs every 10 minutes, Monday (1) through Friday (5) ONLY.
+    # No more weekend shift! 🛑🍻
+    - cron: '*/10 * * * 1-5'
   workflow_dispatch: # Allows manual run button
 
 jobs:
