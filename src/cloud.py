@@ -58,7 +58,9 @@ class CloudManager:
         try:
             sheet = self.client.open_by_url(SHEET_URL)
             ws = sheet.worksheet(WORKSHEET_STATE)
-            ws.update(MEMORY_CELL, json.dumps(self.state))
+            # 🛠️ FIX: Use update_acell() for single-cell updates. 
+            # 'update()' is flaky with newer gspread versions for single cells.
+            ws.update_acell(MEMORY_CELL, json.dumps(self.state))
         except Exception as e:
             print(f"❌ Save Failed: {e}")
 
@@ -99,6 +101,10 @@ class CloudManager:
     def upload_chart(self, df, pair, signal, price):
         """Generates chart and uploads to ImgBB"""
         try:
+            # FIX: mplfinance requires the index to be a DatetimeIndex.
+            if 'time' in df.columns:
+                df = df.set_index('time')
+
             filename = f"chart_{int(time.time())}.png"
             buf = io.BytesIO()
             
@@ -106,7 +112,7 @@ class CloudManager:
             mc = mpf.make_marketcolors(up='green', down='red', inherit=True)
             s  = mpf.make_mpf_style(marketcolors=mc)
             
-            # Title with Price (As requested)
+            # Title with Price
             title_text = f"{pair} {signal} @ {price:.5f}"
             
             mpf.plot(df, type='candle', style=s, title=title_text, savefig=buf)
