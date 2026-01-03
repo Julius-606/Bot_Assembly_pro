@@ -1,98 +1,209 @@
 import time
+import MetaTrader5 as mt5
 import pandas as pd
-import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 
 class BrokerAPI:
+    """
+    The Middleman. 👔
+    Talks to MetaTrader 5 so you don't have to.
+    """
     def __init__(self):
-        self.connected = True
+        self.connected = False
+        self.closed_markets = {} 
 
-    def _map_symbol(self, pair):
-        """Maps our pair format (BTC/USD) to Yahoo format (BTC-USD)."""
-        if 'USD' in pair and ('BTC' in pair or 'ETH' in pair or 'SOL' in pair or 'XRP' in pair):
-            return f"{pair.replace('/', '-')}" # BTC-USD
-        elif '/' in pair:
-            return f"{pair.replace('/', '')}=X" # EURUSD=X
-        return pair
+    def startup(self):
+        if not mt5.initialize():
+            print(f"❌ MT5 Init Failed: {mt5.last_error()}")
+            return False
+        
+        account_info = mt5.account_info()
+        if account_info:
+            print(f"✅ MT5 Connected to {account_info.server} (Account: {account_info.login})")
+            self.connected = True
+            return True
+        return False
 
-    def get_symbol_info(self, pair):
-        class SymbolInfo:
-            def __init__(self, p):
-                self.point = 0.01 if 'BTC' in p or 'ETH' in p else 0.0001
-                self.spread = 50 if 'BTC' in p else 2 
-        return SymbolInfo(pair)
+    def check_connection(self):
+        return mt5.terminal_info() is not None
+
+    def get_server_time_iso(self):
+        """Returns ISO format string for logging. No more local PC time lies."""
+        dt = self.get_server_datetime()
+        return dt.isoformat()
+
+    def get_server_datetime(self):
+        """
+        Returns a proper datetime object of the Server Time.
+        Used for 'Monday' and 'Weekend' logic to ensure we are synced with New York/Broker time.
+        """
+        try:
+            # Try getting time from a major pair (most accurate)
+            tick = mt5.symbol_info_tick("EURUSD")
+            if tick:
+                return datetime.fromtimestamp(tick.time)
+            
+            # Fallback to general Server Time
+            server_time = mt5.TimeCurrent()
+            if server_time:
+                return datetime.fromtimestamp(server_time)
+                
+        except Exception as e:
+            print(f"⚠️ Time Fetch Error: {e}")
+            
+        # Ultimate Fallback: Local PC Time (Keeps the bot alive, but barely)
+        return datetime.now()
+
+    def get_balance(self):
+        """Returns the actual account balance (Equity? No, Balance. We don't realize floating PnL)."""
+        info = mt5.account_info()
+        return info.balance if info else 0.0
 
     def get_tick(self, pair):
-        symbol = self._map_symbol(pair)
-        try:
-            ticker = yf.Ticker(symbol)
-            # Fast fetch of recent data
-            df = ticker.history(period="1d", interval="1m")
-            if not df.empty:
-                last_price = df['Close'].iloc[-1]
-                # Simulating spread since YF gives mid-price mostly
-                spread = 0.0002 if 'X' in symbol else 1.0 
-                return type('Tick', (object,), {'bid': last_price, 'ask': last_price + spread, 'time': datetime.now()})
-            
-            # 🚨 FIX: Return None if data is empty (Market Closed/Error)
-            # Do NOT return 0, or the bot will close all trades at $0!
-            return None
-            
-        except:
-            return None
+        return mt5.symbol_info_tick(pair)
 
-    def fetch_candles(self, pair, timeframe, count):
-        symbol = self._map_symbol(pair)
+    def get_spread(self, pair):
+        info = mt5.symbol_info(pair)
+        if not info: return 0
+        # Spread is usually in points
+        return info.spread
+    
+    def fetch_candles(self, pair, timeframe, limit=300):
+        """
+        Fetches historical candle data for strategy calculation.
+        """
+        if not self.check_connection(): return pd.DataFrame()
         
-        # Map timeframe to YF interval
-        interval_map = {
-            '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m',
-            '1h': '1h', '4h': '1h', '1d': '1d'
+        # Map string timeframe to MT5 constant
+        tf_map = {
+            '1m': mt5.TIMEFRAME_M1,
+            '5m': mt5.TIMEFRAME_M5,
+            '15m': mt5.TIMEFRAME_M15,
+            '30m': mt5.TIMEFRAME_M30,
+            '1h': mt5.TIMEFRAME_H1,
+            '4h': mt5.TIMEFRAME_H4,
+            '1d': mt5.TIMEFRAME_D1,
         }
-        yf_interval = interval_map.get(timeframe, '1m')
         
-        # Adjust period based on count required
-        period = "1d"
-        if timeframe in ['1h', '4h']: period = "5d"
+        mt5_tf = tf_map.get(timeframe, mt5.TIMEFRAME_M15)
         
-        try:
-            ticker = yf.Ticker(symbol)
-            df = ticker.history(period=period, interval=yf_interval)
+        rates = mt5.copy_rates_from_pos(pair, mt5_tf, 0, limit)
+        
+        if rates is None or len(rates) == 0:
+            return pd.DataFrame()
             
-            if df.empty: return pd.DataFrame()
-            
-            # Format columns to match our logic (lowercase)
-            df = df.reset_index()
-            df = df.rename(columns={
-                'Datetime': 'time', 'Date': 'time',
-                'Open': 'open', 'High': 'high', 
-                'Low': 'low', 'Close': 'close', 'Volume': 'tick_volume'
-            })
-            
-            # YF returns timezone-aware datetimes, ensure compatibility
-            df['time'] = pd.to_datetime(df['time']).dt.tz_localize(None)
-            
-            return df.tail(count)
-            
-        except Exception as e:
-            print(f"⚠️ Candle Fetch Error ({pair}): {e}")
-            return pd.DataFrame(columns=['time','open','high','low','close','tick_volume'])
+        df = pd.DataFrame(rates)
+        df['time'] = pd.to_datetime(df['time'], unit='s')
+        
+        return df
 
     def execute_trade(self, pair, signal, volume, sl, tp, comment):
-        # Execution remains simulated (Paper Trading)
-        # But entry price is REAL now.
-        tick = self.get_tick(pair)
+        # Cooldown check
+        if pair in self.closed_markets:
+            if time.time() < self.closed_markets[pair]: return None
+            else: del self.closed_markets[pair] 
+
+        tick = mt5.symbol_info_tick(pair)
+        if not tick: return None
         
-        if not tick:
-            # Fallback if tick fails right at execution
+        price = tick.ask if signal == 'BUY' else tick.bid
+        action_type = mt5.ORDER_TYPE_BUY if signal == 'BUY' else mt5.ORDER_TYPE_SELL
+        
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": pair,
+            "volume": float(volume),
+            "type": action_type,
+            "price": float(price),
+            "sl": float(sl),
+            "tp": float(tp),
+            "deviation": 20,
+            "magic": 234000,
+            "comment": comment,
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
+        
+        result = mt5.order_send(request)
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            error_msg = result.comment if result else "Unknown Error"
+            print(f"❌ Order Failed ({pair}): {error_msg}")
+            # Penalty box for 60 seconds
+            self.closed_markets[pair] = time.time() + 60 
             return None
+             
+        return result
+
+    def modify_position(self, ticket, sl, tp):
+        """
+        Updates the SL/TP on the Server Side. 
+        """
+        request = {
+            "action": mt5.TRADE_ACTION_SLTP,
+            "position": int(ticket),
+            "sl": float(sl),
+            "tp": float(tp),
+            "magic": 234000,
+        }
+        result = mt5.order_send(request)
+        if result is None:
+            return False
+        return result.retcode == mt5.TRADE_RETCODE_DONE
+
+    def close_trade(self, ticket, symbol, volume, is_long):
+        """Manual Close for Strategy Exits or Emergencies."""
+        tick = mt5.symbol_info_tick(symbol)
+        if not tick: return False
+        
+        price = tick.bid if is_long else tick.ask
+        type_op = mt5.ORDER_TYPE_SELL if is_long else mt5.ORDER_TYPE_BUY
+        
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": float(volume),
+            "type": type_op,
+            "position": int(ticket),
+            "price": float(price),
+            "deviation": 20,
+            "magic": 234000,
+            "comment": "Bot Exit",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_IOC,
+        }
+        result = mt5.order_send(request)
+        if result is None:
+            return False
+        return result.retcode == mt5.TRADE_RETCODE_DONE
+
+    def check_trade_status(self, ticket):
+        """
+        Checks if the trade is alive. 
+        If closed, fetches the Real PnL from history.
+        """
+        # 1. Is it still open?
+        positions = mt5.positions_get(ticket=int(ticket))
+        if positions:
+            return {'status': 'open'}
+
+        # 2. If not open, it's closed. Fetch History to find out why/how much.
+        try:
+            history = mt5.history_deals_get(position=int(ticket))
+            if history:
+                # Sum profit + swap + commission
+                total_profit = sum([d.profit + d.swap + d.commission for d in history])
+                # Accessing the last deal for exit info
+                last_deal = history[-1]
+                exit_price = last_deal.price
+                close_time_ts = last_deal.time
+                
+                return {
+                    'status': 'closed',
+                    'pnl': round(total_profit, 2),
+                    'exit_price': exit_price,
+                    'close_time': datetime.fromtimestamp(close_time_ts).isoformat()
+                }
+        except Exception as e:
+            print(f"⚠️ History Check Error: {e}")
             
-        entry = tick.ask if signal == 'BUY' else tick.bid
-        
-        # Return a receipt object
-        class TradeReceipt:
-            def __init__(self, p, t):
-                self.price = p
-                self.ticket = t
-        
-        return TradeReceipt(entry, int(time.time()))
+        return {'status': 'unknown'}
