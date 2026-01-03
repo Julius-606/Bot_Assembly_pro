@@ -1,10 +1,9 @@
-python-telegram-bot==20.*
+# The fuel for the rocket 🚀
+MetaTrader5
 pandas
-mplfinance
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-
+numpy
+python-telegram-bot
 gspread
-yfinance
-
+google-api-python-client
+google-auth
+requests
