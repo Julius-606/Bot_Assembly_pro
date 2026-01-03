@@ -1,131 +1,122 @@
 import json
 import io
-import base64
 import time
 import requests
-import gspread
-import mplfinance as mpf
+import gspread 
 import pandas as pd
 from datetime import datetime
 from google.oauth2.service_account import Credentials
-from config import RAW_GOOGLE_CREDS, SHEET_URL, WORKSHEET_STATE, MEMORY_CELL, WORKSHEET_LOGS, INITIAL_BALANCE, USER_DEFAULT_MARKETS, DEFAULT_PARAMS, IMGBB_API_KEY, DRIVE_FOLDER_ID, DEFAULT_STRATEGY
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+
+# Importing from the root config
+from config import GOOGLE_CREDS, SHEET_URL, WORKSHEET_LOGS, USER_DEFAULT_MARKETS, DEFAULT_PARAMS, DRIVE_FOLDER_ID, DEFAULT_STRATEGY, MEMORY_FILENAME
 
 class CloudManager:
+    """
+    The Brain 🧠
+    Handles Google Sheets logging and Drive memory persistence.
+    """
     def __init__(self):
-        self.client = None
+        self.sheets_client = None
+        self.drive_service = None
         self.state = {}
-        self.last_update_id = 0
+        self.file_id = None
+        
+        self.default_state = {
+            "status": "stopped",
+            "current_balance": 0.0,
+            "active_strategy": DEFAULT_STRATEGY,
+            "active_pairs": USER_DEFAULT_MARKETS,
+            "strategy_params": DEFAULT_PARAMS,
+            "open_bot_trades": [],
+            "trade_history": [],
+            "last_update_id": 0
+        }
+        
         self.setup()
         self.load_state()
 
     def setup(self):
         try:
-            creds = Credentials.from_service_account_info(
-                json.loads(RAW_GOOGLE_CREDS), 
-                scopes=['https://www.googleapis.com/auth/spreadsheets']
-            )
-            self.client = gspread.authorize(creds)
+            scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+            creds = Credentials.from_service_account_info(GOOGLE_CREDS, scopes=scopes)
+            self.sheets_client = gspread.authorize(creds)
+            self.drive_service = build('drive', 'v3', credentials=creds)
         except Exception as e:
             print(f"❌ Cloud Auth Failed: {e}")
 
     def load_state(self):
         try:
-            sheet = self.client.open_by_url(SHEET_URL)
-            try: ws = sheet.worksheet(WORKSHEET_STATE)
-            except: ws = sheet.add_worksheet(title=WORKSHEET_STATE, rows=10, cols=2)
-            
-            val = ws.acell(MEMORY_CELL).value
-            if not val:
-                print("⚠️ Brain Empty! Initializing...")
-                self.state = {
-                    "status": "running",
-                    "current_balance": INITIAL_BALANCE,
-                    "active_strategy": DEFAULT_STRATEGY,
-                    "active_pairs": USER_DEFAULT_MARKETS,
-                    "strategy_params": DEFAULT_PARAMS,
-                    "open_bot_trades": [],
-                    "trade_history": []
-                }
+            if not self.drive_service: raise Exception("Offline")
+            query = f"name = '{MEMORY_FILENAME}' and '{DRIVE_FOLDER_ID}' in parents and trashed = false"
+            results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
+            items = results.get('files', [])
+
+            if not items:
+                print("⚠️ New Memory Created.")
+                self.state = self.default_state.copy()
+                self.state['status'] = "running"
+                self.file_id = None
             else:
-                self.state = json.loads(val)
-                print(f"🧠 Brain Loaded. Balance: ${self.state['current_balance']}")
+                self.file_id = items[0]['id']
+                request = self.drive_service.files().get_media(fileId=self.file_id)
+                fh = io.BytesIO()
+                downloader = MediaIoBaseDownload(fh, request)
+                done = False
+                while done is False: status, done = downloader.next_chunk()
+                
+                fh.seek(0)
+                self.state = json.loads(fh.read().decode('utf-8'))
+                
+                for k, v in self.default_state.items():
+                    if k not in self.state: self.state[k] = v
+                
+                print(f"🧠 Memory Loaded. Balance: ${self.state['current_balance']}")
                 
         except Exception as e:
             print(f"❌ Load Failed: {e}")
-            self.state = {}
+            self.state = self.default_state.copy()
 
     def save_state(self):
+        if not self.drive_service: return
         try:
-            sheet = self.client.open_by_url(SHEET_URL)
-            ws = sheet.worksheet(WORKSHEET_STATE)
-            # 🛠️ FIX: Use update_acell() for single-cell updates. 
-            # 'update()' is flaky with newer gspread versions for single cells.
-            ws.update_acell(MEMORY_CELL, json.dumps(self.state))
+            media = MediaIoBaseUpload(io.BytesIO(json.dumps(self.state, indent=2).encode('utf-8')), mimetype='application/json', resumable=True)
+            if self.file_id:
+                self.drive_service.files().update(fileId=self.file_id, media_body=media).execute()
+            else:
+                f = self.drive_service.files().create(body={'name': MEMORY_FILENAME, 'parents': [DRIVE_FOLDER_ID]}, media_body=media, fields='id').execute()
+                self.file_id = f.get('id')
         except Exception as e:
             print(f"❌ Save Failed: {e}")
 
     def log_trade(self, trade):
+        if not self.sheets_client: return
         try:
-            sheet = self.client.open_by_url(SHEET_URL)
+            sheet = self.sheets_client.open_by_url(SHEET_URL)
             try: ws = sheet.worksheet(WORKSHEET_LOGS)
             except: ws = sheet.add_worksheet(title=WORKSHEET_LOGS, rows=1000, cols=20)
             
-            trail_str = f"{trade.get('trail_count',0)}"
+            status_id = str(trade.get('ticket', 'UNKNOWN'))
             
+            # --- CLEANED UP LOGGING (No rent-free zeros) ---
+            # Ticket | Strategy | Signal | Pair | OpenTime | Entry | SL | TP | Vol | Spread | Exit | CloseTime | PnL | Balance
             row = [
-                "CLOSED",
-                trade['strategy'],
-                trade['signal'],
+                status_id, 
+                trade['strategy'], 
+                trade['signal'], 
                 trade['pair'],
-                trade['open_time'],
-                trade['entry_price'],
-                trade['stop_loss_price'],
-                0, # Spread
-                trade['volume'],
-                0, # Commission
-                0, # Swap
+                trade['open_time'], 
+                trade['entry_price'], 
+                trade['stop_loss_price'], 
                 trade['take_profit_price'],
+                trade['volume'], 
+                trade.get('spread', 0),  # ✨ New Spread Column
                 trade['exit_price'],
-                datetime.now().isoformat(),
-                trade['pnl'],
-                f"{self.state['current_balance']:.2f}",
-                trail_str,
-                trade.get('screenshot', 'N/A')
+                trade.get('close_time', ''), # Empty string if N/A
+                trade['pnl'], 
+                f"{self.state['current_balance']:.2f}"
             ]
-            
-            ws.append_row(row)
-            
+            ws.append_row(row, value_input_option="USER_ENTERED")
         except Exception as e:
-            print(f"❌ Logging Failed: {e}")
-
-    def upload_chart(self, df, pair, signal, price):
-        """Generates chart and uploads to ImgBB"""
-        try:
-            # FIX: mplfinance requires the index to be a DatetimeIndex.
-            if 'time' in df.columns:
-                df = df.set_index('time')
-
-            filename = f"chart_{int(time.time())}.png"
-            buf = io.BytesIO()
-            
-            # Style
-            mc = mpf.make_marketcolors(up='green', down='red', inherit=True)
-            s  = mpf.make_mpf_style(marketcolors=mc)
-            
-            # Title with Price
-            title_text = f"{pair} {signal} @ {price:.5f}"
-            
-            mpf.plot(df, type='candle', style=s, title=title_text, savefig=buf)
-            buf.seek(0)
-            
-            payload = {
-                "key": IMGBB_API_KEY,
-                "image": base64.b64encode(buf.getvalue()).decode('utf-8')
-            }
-            res = requests.post("https://api.imgbb.com/1/upload", data=payload)
-            data = res.json()
-            return data['data']['url']
-            
-        except Exception as e:
-            print(f"❌ Chart Upload Failed: {e}")
-            return "UPLOAD_FAILED"
+            print(f"❌ Log Failed: {e}")
