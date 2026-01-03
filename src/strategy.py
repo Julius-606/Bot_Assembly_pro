@@ -1,3 +1,8 @@
+#============================================================================
+#---------------------------THE TREND RUNNER (M15)---------------------------
+#============================================================================
+# "Real Talk" Edition: High Probability, Trend Following, ATR Risk Mgmt.
+
 import pandas as pd
 import numpy as np
 
@@ -6,121 +11,108 @@ import numpy as np
 # ==============================================================================
 
 def calc_indicators(df, params):
-    if df.empty: return df # Safety check
-    
-    # RSI
-    p = params['MR_RSI_PERIOD']
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=p).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=p).mean().replace(0, 1e-10)
-    rs = gain / loss
-    df['rsi'] = 100 - (100 / (1 + rs)).fillna(50)
-    
-    # MACD
-    f, s, sig = params['MOMO_MACD_FAST'], params['MOMO_MACD_SLOW'], params['MOMO_MACD_SIGNAL']
-    df['ema_fast'] = df['close'].ewm(span=f).mean()
-    df['ema_slow'] = df['close'].ewm(span=s).mean()
-    df['macd'] = df['ema_fast'] - df['ema_slow']
-    df['macd_signal'] = df['macd'].ewm(span=sig).mean()
-    df['macd_hist'] = df['macd'] - df['macd_signal']
-    
-    # BB
-    bp, bs = params['MR_BB_PERIOD'], params['MR_BB_STD_DEV']
-    df['bb_mid'] = df['close'].rolling(window=bp).mean()
-    df['bb_std'] = df['close'].rolling(window=bp).std()
-    df['bb_upper'] = df['bb_mid'] + (df['bb_std'] * bs)
-    df['bb_lower'] = df['bb_mid'] - (df['bb_std'] * bs)
-
-    return df
-
-def calc_adx(df, params):
-    """Calculates ADX (Average Directional Index) for Regime Filter."""
+    """
+    Calculates the 'Holy Trinity' of Algo Trading:
+    1. Trend (EMA 200)
+    2. Volatility (ATR)
+    3. Momentum (RSI)
+    """
     if df.empty: return df
     
-    n = params.get('REGIME_ADX_PERIOD', 14)
+    # 1. THE TREND FILTER (200 EMA)
+    # The most respected moving average by institutions.
+    df['ema_200'] = df['close'].ewm(span=200, adjust=False).mean()
     
-    # 1. True Range (TR)
+    # 2. VOLATILITY (ATR - Average True Range)
+    # Measures how much the price is actually moving.
     df['tr0'] = abs(df['high'] - df['low'])
     df['tr1'] = abs(df['high'] - df['close'].shift(1))
     df['tr2'] = abs(df['low'] - df['close'].shift(1))
-    df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
+    df['atr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1).rolling(window=14).mean()
     
-    # 2. Directional Movement (+DM, -DM)
-    df['up'] = df['high'] - df['high'].shift(1)
-    df['down'] = df['low'].shift(1) - df['low']
-    
-    df['pdm'] = np.where((df['up'] > df['down']) & (df['up'] > 0), df['up'], 0.0)
-    df['mdm'] = np.where((df['down'] > df['up']) & (df['down'] > 0), df['down'], 0.0)
-    
-    # 3. Smoothing (Using EMA as approximation for Wilder's)
-    # Wilder's Smoothing implies alpha = 1/n
-    df['tr_s'] = df['tr'].ewm(alpha=1/n, adjust=False).mean()
-    df['pdm_s'] = df['pdm'].ewm(alpha=1/n, adjust=False).mean()
-    df['mdm_s'] = df['mdm'].ewm(alpha=1/n, adjust=False).mean()
-    
-    # 4. Directional Indexes (+DI, -DI)
-    df['pdi'] = 100 * (df['pdm_s'] / df['tr_s'])
-    df['mdi'] = 100 * (df['mdm_s'] / df['tr_s'])
-    
-    # 5. DX and ADX
-    df['dx'] = 100 * abs(df['pdi'] - df['mdi']) / (df['pdi'] + df['mdi']).replace(0, 1)
-    df['adx'] = df['dx'].ewm(alpha=1/n, adjust=False).mean()
-    
+    # 3. MOMENTUM (RSI)
+    # Just to make sure we aren't buying at the absolute top.
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean().replace(0, 1e-10)
+    rs = gain / loss
+    df['rsi'] = 100 - (100 / (1 + rs)).fillna(50)
+
     return df
 
-def check_sr_trend(pair, df_m1, df_m5, broker, params):
-    # Logic for trend trading
-    return None
+# ==============================================================================
+# ⚔️ STRATEGY LOGIC
+# ==============================================================================
 
-def check_scalper(pair, df_m5, broker, params):
-    # Logic for scalping
-    return None
+def check_trend_runner(pair, df, params):
+    """
+    The Strategy:
+    1. Identify Trend (Above/Below 200 EMA).
+    2. Wait for a Breakout of the recent 20-candle High/Low.
+    3. Enter with wide stops to let it run.
+    """
+    # We need at least 200 candles to calculate the EMA 200
+    if len(df) < 200: return None, None, None, None
+    
+    curr = df.iloc[-1]
+    prev = df.iloc[-2]
+    
+    # ATR is our 'Unit of Risk'. If ATR is 0, market is dead.
+    atr = curr['atr'] if curr['atr'] > 0 else 0.0010
+    
+    # Define Recent Range (Last 20 candles)
+    # This represents the "Battlefield" where bulls and bears fought.
+    recent_high = df['high'].iloc[-21:-1].max()
+    recent_low = df['low'].iloc[-21:-1].min()
+    
+    # --- LONG SETUP (BUY) ---
+    # Rule 1: Trend is UP (Price > EMA 200)
+    # Rule 2: Price BROKE the recent High (Breakout)
+    # Rule 3: RSI is NOT Overbought (>70) - We don't want to FOMO at the top
+    if (curr['close'] > curr['ema_200']) and \
+       (curr['close'] > recent_high) and \
+       (curr['rsi'] < 70):
+           
+           # Risk Management (The Holy Grail)
+           # Stop Loss = 2 ATRs below price (Give it room to breathe)
+           sl = curr['close'] - (atr * 2.0)
+           
+           # Take Profit = 3 ATRs above (Aim for 1.5 Risk:Reward Ratio minimum)
+           # Or we let the 'manage_trades' function trail it.
+           tp = curr['close'] + (atr * 4.0) 
+           
+           return 'BUY', sl, tp, 'TREND_RUNNER'
 
-def check_mean_revert(pair, df_m5, broker, params):
-    # Logic for mean reversion
-    return None
+    # --- SHORT SETUP (SELL) ---
+    # Rule 1: Trend is DOWN (Price < EMA 200)
+    # Rule 2: Price BROKE the recent Low
+    # Rule 3: RSI is NOT Oversold (<30)
+    if (curr['close'] < curr['ema_200']) and \
+       (curr['close'] < recent_low) and \
+       (curr['rsi'] > 30):
+           
+           sl = curr['close'] + (atr * 2.0)
+           tp = curr['close'] - (atr * 4.0)
+           
+           return 'SELL', sl, tp, 'TREND_RUNNER'
+
+    return None, None, None, None
+
+# ==============================================================================
+# 🚦 GENERATOR
+# ==============================================================================
 
 def generate_signal(pair, broker, cloud):
-    strat = cloud.state.get('active_strategy', 'Auto')
     params = cloud.state['strategy_params']
     
-    # 1. Fetch Data
-    df_m5 = broker.fetch_candles(pair, '5m', 50)
-    if df_m5.empty: return None, None, None, None # Safety Return
+    # 1. Fetch M15 Data (The Golden Timeframe)
+    # We grab 300 candles to ensure EMA 200 is accurate
+    df_m15 = broker.fetch_candles(pair, '15m', 300)
     
-    df_m5 = calc_indicators(df_m5, params)
+    if df_m15.empty: return None, None, None, None
     
-    # 2. Router
-    if strat == 'Auto':
-        # Check Regime (ADX on M15)
-        df_m15 = broker.fetch_candles(pair, '15m', 50)
-        if df_m15.empty: return None, None, None, None
-        
-        # 🛠️ FIX: Actually calculate ADX now
-        df_m15 = calc_adx(df_m15, params)
-        adx = df_m15['adx'].iloc[-1] if not df_m15.empty and 'adx' in df_m15.columns else 0
-        
-        # TRENDING REGIME
-        if adx >= params['REGIME_ADX_THRESHOLD']:
-            # Check SR_TREND
-            df_m1 = broker.fetch_candles(pair, '1m', params['CANDLE_COUNT'])
-            if df_m1.empty: return None, None, None, None
-            
-            # 🛠️ FIX: Calculate indicators for M1 data so 'bb_std' exists!
-            df_m1 = calc_indicators(df_m1, params)
-
-            res = check_sr_trend(pair, df_m1, df_m5, broker, params)
-            if res: return res
-            
-            # Check SCALPER
-            res = check_scalper(pair, df_m5, broker, params)
-            if res: return res
-            return None, None, None, None
-        # RANGING REGIME
-        else:
-            # RANGING REGIME
-            res = check_mean_revert(pair, df_m5, broker, params)
-            if res: return res
-            return None, None, None, None
-            
-    return None, None, None, None
+    # 2. Calc
+    df_m15 = calc_indicators(df_m15, params)
+    
+    # 3. Run Strategy
+    return check_trend_runner(pair, df_m15, params)
