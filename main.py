@@ -8,9 +8,9 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 
 # Import Modules
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, DEFAULT_PARAMS
-from cloud import CloudManager
-from broker import BrokerAPI
-from strategy import generate_signal
+from src/cloud import CloudManager
+from src/broker import BrokerAPI
+from src/strategy import generate_signal
 
 # Globals
 cloud = None
