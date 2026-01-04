@@ -14,7 +14,7 @@ class BrokerAPI:
         self.closed_markets = {} 
 
     def startup(self):
-        # ⚠️ CRITICAL: Passing the explicit path to the EXE
+        # 🛠️ FIX: We force feed the path to the library
         if not mt5.initialize(path=MT5_PATH):
             print(f"❌ MT5 Init Failed: {mt5.last_error()}")
             return False
