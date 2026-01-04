@@ -40,15 +40,22 @@ class CloudManager:
     def setup(self):
         try:
             scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-            creds = Credentials.from_service_account_info(GOOGLE_CREDS, scopes=scopes)
+            
+            # FIX: Parse the string into a dict!
+            creds_dict = json.loads(GOOGLE_CREDS)
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+            
             self.sheets_client = gspread.authorize(creds)
             self.drive_service = build('drive', 'v3', credentials=creds)
+            print("   ☁️  Google Auth -> [SUCCESS]")
         except Exception as e:
             print(f"❌ Cloud Auth Failed: {e}")
 
     def load_state(self):
         try:
-            if not self.drive_service: raise Exception("Offline")
+            if not self.drive_service: return
+            
+            # Escape single quotes in filename for the query
             query = f"name = '{MEMORY_FILENAME}' and '{DRIVE_FOLDER_ID}' in parents and trashed = false"
             results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
             items = results.get('files', [])
@@ -69,10 +76,11 @@ class CloudManager:
                 fh.seek(0)
                 self.state = json.loads(fh.read().decode('utf-8'))
                 
+                # Merge defaults to avoid key errors if you add new features later
                 for k, v in self.default_state.items():
                     if k not in self.state: self.state[k] = v
                 
-                print(f"🧠 Memory Loaded. Balance: ${self.state['current_balance']}")
+                print(f"🧠 Memory Loaded. Balance: ${self.state.get('current_balance', 0)}")
                 
         except Exception as e:
             print(f"❌ Load Failed: {e}")
@@ -99,8 +107,6 @@ class CloudManager:
             
             status_id = str(trade.get('ticket', 'UNKNOWN'))
             
-            # --- CLEANED UP LOGGING (No rent-free zeros) ---
-            # Ticket | Strategy | Signal | Pair | OpenTime | Entry | SL | TP | Vol | Spread | Exit | CloseTime | PnL | Balance
             row = [
                 status_id, 
                 trade['strategy'], 
@@ -111,11 +117,11 @@ class CloudManager:
                 trade['stop_loss_price'], 
                 trade['take_profit_price'],
                 trade['volume'], 
-                trade.get('spread', 0),  # ✨ New Spread Column
+                trade.get('spread', 0),
                 trade['exit_price'],
-                trade.get('close_time', ''), # Empty string if N/A
+                trade.get('close_time', ''),
                 trade['pnl'], 
-                f"{self.state['current_balance']:.2f}"
+                f"{self.state.get('current_balance', 0):.2f}"
             ]
             ws.append_row(row, value_input_option="USER_ENTERED")
         except Exception as e:
