@@ -9,7 +9,6 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
-# Importing from the root config
 from config import GOOGLE_CREDS, SHEET_URL, WORKSHEET_LOGS, USER_DEFAULT_MARKETS, DEFAULT_PARAMS, DRIVE_FOLDER_ID, DEFAULT_STRATEGY, MEMORY_FILENAME
 
 class CloudManager:
@@ -41,10 +40,10 @@ class CloudManager:
         try:
             scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
             
-            # FIX: Parse the string into a dict!
-            creds_dict = json.loads(GOOGLE_CREDS)
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+            # 🛠️ FIX: We must PARSE the JSON string into a Dictionary
+            creds_dict = json.loads(GOOGLE_CREDS) 
             
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             self.sheets_client = gspread.authorize(creds)
             self.drive_service = build('drive', 'v3', credentials=creds)
             print("   ☁️  Google Auth -> [SUCCESS]")
@@ -55,7 +54,6 @@ class CloudManager:
         try:
             if not self.drive_service: return
             
-            # Escape single quotes in filename for the query
             query = f"name = '{MEMORY_FILENAME}' and '{DRIVE_FOLDER_ID}' in parents and trashed = false"
             results = self.drive_service.files().list(q=query, fields="files(id, name)").execute()
             items = results.get('files', [])
@@ -76,7 +74,6 @@ class CloudManager:
                 fh.seek(0)
                 self.state = json.loads(fh.read().decode('utf-8'))
                 
-                # Merge defaults to avoid key errors if you add new features later
                 for k, v in self.default_state.items():
                     if k not in self.state: self.state[k] = v
                 
