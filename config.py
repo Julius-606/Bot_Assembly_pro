@@ -4,11 +4,11 @@ import os
 # 🔐 SECRET SAUCE (CREDENTIALS)
 # ==============================================================================
 
-# --- TELEGRAM CONFIG ---
 TELEGRAM_BOT_TOKEN = "8141234434:AAFaO3z4NCASSFYwYkH4t1Q4lkA0Us7x_qA" 
 TELEGRAM_CHAT_ID = "6882899041"
 
 # --- GOOGLE CLOUD CONFIG ---
+# Kept as a raw string to prevent syntax errors, we parse it in cloud.py
 GOOGLE_CREDS = r"""
 {
   "type": "service_account",
@@ -25,13 +25,11 @@ GOOGLE_CREDS = r"""
 }
 """
 
-# Google Sheets & Drive IDs
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
 WORKSHEET_LOGS = "Sheet1"
 MEMORY_FILENAME = "mainframe_memory.json"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
 
-# --- STRATEGY DEFAULTS ---
 DEFAULT_STRATEGY = "TREND_RUNNER"
 USER_DEFAULT_MARKETS = [
     "EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"
@@ -45,6 +43,6 @@ DEFAULT_PARAMS = {
 }
 
 # --- BROKER PATH ---
-# ⚠️ UPDATE THIS: Use "C:\\Program Files\\MetaTrader 5\\terminal64.exe" usually.
-# If you found it in a different folder via the 'find' command, update it here.
+# ⚠️ This is the DEFAULT path where the installer puts it.
+# If 'find' gives you something different, change this!
 MT5_PATH = r"C:\Program Files\MetaTrader 5\terminal64.exe"
