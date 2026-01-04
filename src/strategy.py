@@ -18,12 +18,6 @@ class Strategy:
     # 🧠 INDICATORS
     # ==============================================================================
     def calc_indicators(self, df, params):
-        """
-        Calculates the 'Holy Trinity' of Algo Trading:
-        1. Trend (EMA 200)
-        2. Volatility (ATR)
-        3. Momentum (RSI)
-        """
         if df.empty: return df
         
         # 1. THE TREND FILTER (200 EMA)
@@ -48,21 +42,10 @@ class Strategy:
     # ⚔️ STRATEGY LOGIC
     # ==============================================================================
     def check_trend_runner(self, pair, df, params):
-        """
-        The Strategy:
-        1. Identify Trend (Above/Below 200 EMA).
-        2. Wait for a Breakout of the recent 20-candle High/Low.
-        3. Enter with wide stops.
-        """
-        # We need at least 200 candles to calculate the EMA 200
         if len(df) < 200: return None, None, None, None
         
         curr = df.iloc[-1]
-        
-        # ATR is our 'Unit of Risk'. If ATR is 0, market is dead.
         atr = curr['atr'] if curr['atr'] > 0 else 0.0010
-        
-        # Define Recent Range (Last 20 candles)
         recent_high = df['high'].iloc[-21:-1].max()
         recent_low = df['low'].iloc[-21:-1].min()
         
@@ -70,20 +53,16 @@ class Strategy:
         if (curr['close'] > curr['ema_200']) and \
            (curr['close'] > recent_high) and \
            (curr['rsi'] < 70):
-               
                sl = curr['close'] - (atr * 2.0)
                tp = curr['close'] + (atr * 4.0) 
-               
                return 'BUY', sl, tp, 'TREND_RUNNER'
 
         # --- SHORT SETUP (SELL) ---
         if (curr['close'] < curr['ema_200']) and \
            (curr['close'] < recent_low) and \
            (curr['rsi'] > 30):
-               
                sl = curr['close'] + (atr * 2.0)
                tp = curr['close'] - (atr * 4.0)
-               
                return 'SELL', sl, tp, 'TREND_RUNNER'
 
         return None, None, None, None
@@ -92,18 +71,8 @@ class Strategy:
     # 🚦 EXECUTION
     # ==============================================================================
     def analyze(self, pair, broker, cloud):
-        """
-        Main entry point called by main.py
-        """
         params = cloud.state.get('strategy_params', {})
-        
-        # 1. Fetch M15 Data
         df_m15 = broker.fetch_candles(pair, '15m', 300)
-        
         if df_m15.empty: return None, None, None, None
-        
-        # 2. Calc Indicators
         df_m15 = self.calc_indicators(df_m15, params)
-        
-        # 3. Run Logic
         return self.check_trend_runner(pair, df_m15, params)
