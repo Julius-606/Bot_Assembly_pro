@@ -2,6 +2,7 @@ import time
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime
+from config import MT5_PATH  # <-- Import the path!
 
 class BrokerAPI:
     """
@@ -13,7 +14,8 @@ class BrokerAPI:
         self.closed_markets = {} 
 
     def startup(self):
-        if not mt5.initialize():
+        # ⚠️ CRITICAL: Passing the explicit path to the EXE
+        if not mt5.initialize(path=MT5_PATH):
             print(f"❌ MT5 Init Failed: {mt5.last_error()}")
             return False
         
@@ -28,22 +30,15 @@ class BrokerAPI:
         return mt5.terminal_info() is not None
 
     def get_server_time_iso(self):
-        """Returns ISO format string for logging. No more local PC time lies."""
         dt = self.get_server_datetime()
         return dt.isoformat()
 
     def get_server_datetime(self):
-        """
-        Returns a proper datetime object of the Server Time.
-        Used for 'Monday' and 'Weekend' logic to ensure we are synced with New York/Broker time.
-        """
         try:
-            # Try getting time from a major pair (most accurate)
             tick = mt5.symbol_info_tick("EURUSD")
             if tick:
                 return datetime.fromtimestamp(tick.time)
             
-            # Fallback to general Server Time
             server_time = mt5.TimeCurrent()
             if server_time:
                 return datetime.fromtimestamp(server_time)
@@ -51,11 +46,9 @@ class BrokerAPI:
         except Exception as e:
             print(f"⚠️ Time Fetch Error: {e}")
             
-        # Ultimate Fallback: Local PC Time (Keeps the bot alive, but barely)
         return datetime.now()
 
     def get_balance(self):
-        """Returns the actual account balance (Equity? No, Balance. We don't realize floating PnL)."""
         info = mt5.account_info()
         return info.balance if info else 0.0
 
@@ -65,16 +58,11 @@ class BrokerAPI:
     def get_spread(self, pair):
         info = mt5.symbol_info(pair)
         if not info: return 0
-        # Spread is usually in points
         return info.spread
     
     def fetch_candles(self, pair, timeframe, limit=300):
-        """
-        Fetches historical candle data for strategy calculation.
-        """
         if not self.check_connection(): return pd.DataFrame()
         
-        # Map string timeframe to MT5 constant
         tf_map = {
             '1m': mt5.TIMEFRAME_M1,
             '5m': mt5.TIMEFRAME_M5,
@@ -98,7 +86,6 @@ class BrokerAPI:
         return df
 
     def execute_trade(self, pair, signal, volume, sl, tp, comment):
-        # Cooldown check
         if pair in self.closed_markets:
             if time.time() < self.closed_markets[pair]: return None
             else: del self.closed_markets[pair] 
@@ -128,16 +115,12 @@ class BrokerAPI:
         if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
             error_msg = result.comment if result else "Unknown Error"
             print(f"❌ Order Failed ({pair}): {error_msg}")
-            # Penalty box for 60 seconds
             self.closed_markets[pair] = time.time() + 60 
             return None
              
         return result
 
     def modify_position(self, ticket, sl, tp):
-        """
-        Updates the SL/TP on the Server Side. 
-        """
         request = {
             "action": mt5.TRADE_ACTION_SLTP,
             "position": int(ticket),
@@ -151,7 +134,6 @@ class BrokerAPI:
         return result.retcode == mt5.TRADE_RETCODE_DONE
 
     def close_trade(self, ticket, symbol, volume, is_long):
-        """Manual Close for Strategy Exits or Emergencies."""
         tick = mt5.symbol_info_tick(symbol)
         if not tick: return False
         
@@ -177,31 +159,21 @@ class BrokerAPI:
         return result.retcode == mt5.TRADE_RETCODE_DONE
 
     def check_trade_status(self, ticket):
-        """
-        Checks if the trade is alive. 
-        If closed, fetches the Real PnL from history.
-        """
-        # 1. Is it still open?
         positions = mt5.positions_get(ticket=int(ticket))
         if positions:
             return {'status': 'open'}
 
-        # 2. If not open, it's closed. Fetch History to find out why/how much.
         try:
             history = mt5.history_deals_get(position=int(ticket))
             if history:
-                # Sum profit + swap + commission
                 total_profit = sum([d.profit + d.swap + d.commission for d in history])
-                # Accessing the last deal for exit info
                 last_deal = history[-1]
-                exit_price = last_deal.price
-                close_time_ts = last_deal.time
                 
                 return {
                     'status': 'closed',
                     'pnl': round(total_profit, 2),
-                    'exit_price': exit_price,
-                    'close_time': datetime.fromtimestamp(close_time_ts).isoformat()
+                    'exit_price': last_deal.price,
+                    'close_time': datetime.fromtimestamp(last_deal.time).isoformat()
                 }
         except Exception as e:
             print(f"⚠️ History Check Error: {e}")
