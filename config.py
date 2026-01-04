@@ -5,12 +5,10 @@ import os
 # ==============================================================================
 
 # --- TELEGRAM CONFIG ---
-# Get this from @BotFather. Don't share it with your ex. 🤫
 TELEGRAM_BOT_TOKEN = "8141234434:AAFaO3z4NCASSFYwYkH4t1Q4lkA0Us7x_qA" 
 TELEGRAM_CHAT_ID = "6882899041"
 
 # --- GOOGLE CLOUD CONFIG ---
-# Your service account key. This is your VIP pass to Google Drive. 🎟️
 GOOGLE_CREDS = r"""
 {
   "type": "service_account",
@@ -25,9 +23,7 @@ GOOGLE_CREDS = r"""
   "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/mt5-logger-sa%40mt5-algo-bot-logger.iam.gserviceaccount.com",
   "universe_domain": "googleapis.com"
 }
-
 """
-
 
 # Google Sheets & Drive IDs
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
@@ -47,3 +43,8 @@ DEFAULT_PARAMS = {
     "atr_period": 14,
     "risk_per_trade": 0.01
 }
+
+# --- BROKER PATH ---
+# ⚠️ UPDATE THIS: Use "C:\\Program Files\\MetaTrader 5\\terminal64.exe" usually.
+# If you found it in a different folder via the 'find' command, update it here.
+MT5_PATH = r"C:\Program Files\MetaTrader 5\terminal64.exe"
