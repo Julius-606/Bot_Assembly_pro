@@ -15,7 +15,7 @@ class BrokerAPI:
 
     def startup(self):
         # 🛠️ FIX: We force feed the path to the library
-        if not mt5.initialize(path=MT5_PATH):
+        if not mt5.initialize(path=MT5_PATH, timeout=60000):
             print(f"❌ MT5 Init Failed: {mt5.last_error()}")
             return False
         
