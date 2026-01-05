@@ -14,7 +14,29 @@ class BrokerAPI:
         self.closed_markets = {} 
 
     def startup(self):
-        # 🛠️ FIX: We force feed the path to the library
+        """
+        Attempts to connect to MetaTrader 5.
+        Priority 1: Attach to an existing process (Best for Wine/Linux).
+        Priority 2: Launch a new process with extended timeout.
+        """
+        # 1. Try to connect to an EXISTING terminal first (Attach Mode)
+        # This avoids the "IPC Timeout" if the GUI is already running manually.
+        if mt5.initialize():
+            print(f"✅ Attached to running MT5 process!")
+            
+            # Check if actually connected by grabbing info
+            account_info = mt5.account_info()
+            if account_info:
+                 print(f"   Logged in as: {account_info.login} on {account_info.server}")
+                 self.connected = True
+                 return True
+            else:
+                 print("   ⚠️ Attached, but no account info found yet. Check MT5 login state.")
+
+        # 2. If that fails, try to launch it (Backup plan)
+        print("⚠️ No running MT5 found. Attempting manual launch (this might take a while)...")
+        
+        # 🛠️ FIX: Increased timeout to 120,000ms (2 mins) and forced portable mode
         if not mt5.initialize(path=MT5_PATH, timeout=120000, portable=True):
             print(f"❌ MT5 Init Failed: {mt5.last_error()}")
             return False
@@ -24,6 +46,7 @@ class BrokerAPI:
             print(f"✅ MT5 Connected to {account_info.server} (Account: {account_info.login})")
             self.connected = True
             return True
+            
         return False
 
     def check_connection(self):
