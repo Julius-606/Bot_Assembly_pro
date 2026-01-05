@@ -2,7 +2,7 @@ import time
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime
-from config import MT5_PATH  # <-- Import the path!
+from config import MT5_PATH
 
 class BrokerAPI:
     """
@@ -16,38 +16,45 @@ class BrokerAPI:
     def startup(self):
         """
         Attempts to connect to MetaTrader 5.
-        Priority 1: Attach to an existing process (Best for Wine/Linux).
-        Priority 2: Launch a new process with extended timeout.
         """
-        # 1. Try to connect to an EXISTING terminal first (Attach Mode)
-        # This avoids the "IPC Timeout" if the GUI is already running manually.
+        print(f"   🕵️  Scanning for MT5...")
+        
+        # 1. ATTACH MODE (Priority)
+        # We try to attach without specifying path/portable flags first. 
+        # This works best when we launched it manually via shell.
         if mt5.initialize():
-            print(f"✅ Attached to running MT5 process!")
-            
-            # Check if actually connected by grabbing info
+            print(f"   ✅ Attached successfully!")
+            return self._verify_connection()
+
+        # 2. PATH SPECIFIC ATTACH
+        # If generic attach failed, we point to the specific bin.
+        print("   ⚠️ Generic attach failed. Trying path-specific connection...")
+        try:
+            # Removed portable=True to avoid flag conflict with the running process
+            if mt5.initialize(path=MT5_PATH, timeout=60000):
+                print(f"   ✅ Path connection successful!")
+                return self._verify_connection()
+        except Exception as e:
+            print(f"   ❌ Path Error: {e}")
+
+        # 3. FAILURE
+        print(f"   ❌ FATAL: Could not connect to MT5. Last Error: {mt5.last_error()}")
+        return False
+
+    def _verify_connection(self):
+        # Helper to check if we are actually logged in
+        try:
             account_info = mt5.account_info()
             if account_info:
-                 print(f"   Logged in as: {account_info.login} on {account_info.server}")
-                 self.connected = True
-                 return True
+                print(f"   📊 Account: {account_info.login} | Server: {account_info.server} | Balance: {account_info.balance}")
+                self.connected = True
+                return True
             else:
-                 print("   ⚠️ Attached, but no account info found yet. Check MT5 login state.")
-
-        # 2. If that fails, try to launch it (Backup plan)
-        print("⚠️ No running MT5 found. Attempting manual launch (this might take a while)...")
-        
-        # 🛠️ FIX: Increased timeout to 120,000ms (2 mins) and forced portable mode
-        if not mt5.initialize(path=MT5_PATH, timeout=120000, portable=True):
-            print(f"❌ MT5 Init Failed: {mt5.last_error()}")
+                print("   ⚠️ Connected to Terminal, but NO Account Info found. (Login failed?)")
+                return False
+        except Exception as e:
+            print(f"   ❌ Verification Crash: {e}")
             return False
-        
-        account_info = mt5.account_info()
-        if account_info:
-            print(f"✅ MT5 Connected to {account_info.server} (Account: {account_info.login})")
-            self.connected = True
-            return True
-            
-        return False
 
     def check_connection(self):
         return mt5.terminal_info() is not None
