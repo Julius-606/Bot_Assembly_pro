@@ -7,8 +7,12 @@ import os
 TELEGRAM_BOT_TOKEN = "8141234434:AAFaO3z4NCASSFYwYkH4t1Q4lkA0Us7x_qA" 
 TELEGRAM_CHAT_ID = "6882899041"
 
+# --- MT5 SPECIFIC LOGINS ---
+MT5_LOGIN = 105144696
+MT5_PASSWORD = "(yeVM<s4"
+MT5_SERVER = "FBS-Demo"
+
 # --- GOOGLE CLOUD CONFIG ---
-# Kept as a raw string to prevent syntax errors, we parse it in cloud.py
 GOOGLE_CREDS = r"""
 {
   "type": "service_account",
@@ -31,10 +35,18 @@ MEMORY_FILENAME = "mainframe_memory.json"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
 
 DEFAULT_STRATEGY = "TREND_RUNNER"
+
+# --- MARKET CLASSIFICATION ---
 USER_DEFAULT_MARKETS = [
-    "EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD"
+    "EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD",
+    "ETHUSD", "LTCUSD", "AUDUSD", "NZDUSD", "USDCAD", 
+    "USDCHF", "XAGUSD"
 ]
 
+# 24/7 Markets (Do not close on Friday)
+CRYPTO_MARKETS = ["BTCUSD", "ETHUSD", "LTCUSD"]
+
+# --- STRATEGY PARAMETERS ---
 DEFAULT_PARAMS = {
     "ema_period": 200,
     "rsi_period": 14,
@@ -42,7 +54,20 @@ DEFAULT_PARAMS = {
     "risk_per_trade": 0.01
 }
 
+# --- RUNNER LOGIC (TRAILING) ---
+# All values in "points" (usually pips * 10 for forex, or raw price for crypto)
+# Adjust these based on your broker's digits!
+TRAILING_CONFIG = {
+    # If price gets within 50 points (5 pips) of TP...
+    "tp_proximity_threshold": 50, 
+    # ...Push TP away by 200 points (20 pips)
+    "tp_extension": 200,
+    
+    # If price moves 100 points (10 pips) in profit...
+    "sl_activation_distance": 100, 
+    # ...Set SL 50 points behind price
+    "sl_trailing_dist": 50 
+}
+
 # --- BROKER PATH ---
-# ⚠️ This is the DEFAULT path where the installer puts it.
-# If 'find' gives you something different, change this!
 MT5_PATH = r"C:\Program Files\MetaTrader 5\terminal64.exe"
