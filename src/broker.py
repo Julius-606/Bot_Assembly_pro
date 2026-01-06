@@ -2,7 +2,7 @@ import time
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime
-from config import MT5_PATH
+from config import MT5_PATH, MT5_LOGIN, MT5_PASSWORD, MT5_SERVER
 
 class BrokerAPI:
     """
@@ -14,35 +14,30 @@ class BrokerAPI:
         self.closed_markets = {} 
 
     def startup(self):
-        """
-        Attempts to connect to MetaTrader 5.
-        """
         print(f"   🕵️  Scanning for MT5...")
-        
-        # 1. ATTACH MODE (Priority)
-        # We try to attach without specifying path/portable flags first. 
-        # This works best when we launched it manually via shell.
-        if mt5.initialize():
-            print(f"   ✅ Attached successfully!")
-            return self._verify_connection()
-
-        # 2. PATH SPECIFIC ATTACH
-        # If generic attach failed, we point to the specific bin.
-        print("   ⚠️ Generic attach failed. Trying path-specific connection...")
         try:
-            # Removed portable=True to avoid flag conflict with the running process
-            if mt5.initialize(path=MT5_PATH, timeout=60000):
-                print(f"   ✅ Path connection successful!")
-                return self._verify_connection()
+            if not mt5.initialize(path=MT5_PATH, timeout=60000):
+                print(f"   ⚠️ Generic initialize failed. Trying without path...")
+                if not mt5.initialize():
+                    print(f"   ❌ FATAL: Could not init MT5. Error: {mt5.last_error()}")
+                    return False
         except Exception as e:
-            print(f"   ❌ Path Error: {e}")
+            print(f"   ❌ Init Exception: {e}")
+            return False
 
-        # 3. FAILURE
-        print(f"   ❌ FATAL: Could not connect to MT5. Last Error: {mt5.last_error()}")
-        return False
+        print(f"   🔑 Authenticating with account {MT5_LOGIN}...")
+        authorized = mt5.login(login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
+        
+        if authorized:
+            print(f"   ✅ Login Successful!")
+            if not mt5.terminal_info().trade_allowed:
+                print("   ⚠️ WARNING: 'Algo Trading' is disabled in Terminal!")
+            return self._verify_connection()
+        else:
+            print(f"   ❌ Login Failed. Error Code: {mt5.last_error()}")
+            return False
 
     def _verify_connection(self):
-        # Helper to check if we are actually logged in
         try:
             account_info = mt5.account_info()
             if account_info:
@@ -50,7 +45,7 @@ class BrokerAPI:
                 self.connected = True
                 return True
             else:
-                print("   ⚠️ Connected to Terminal, but NO Account Info found. (Login failed?)")
+                print("   ⚠️ Connected to Terminal, but NO Account Info found.")
                 return False
         except Exception as e:
             print(f"   ❌ Verification Crash: {e}")
@@ -66,53 +61,37 @@ class BrokerAPI:
     def get_server_datetime(self):
         try:
             tick = mt5.symbol_info_tick("EURUSD")
-            if tick:
-                return datetime.fromtimestamp(tick.time)
-            
+            if tick: return datetime.fromtimestamp(tick.time)
             server_time = mt5.TimeCurrent()
-            if server_time:
-                return datetime.fromtimestamp(server_time)
-                
-        except Exception as e:
-            print(f"⚠️ Time Fetch Error: {e}")
-            
+            if server_time: return datetime.fromtimestamp(server_time)
+        except: pass
         return datetime.now()
 
     def get_balance(self):
         info = mt5.account_info()
         return info.balance if info else 0.0
 
-    def get_tick(self, pair):
-        return mt5.symbol_info_tick(pair)
-
     def get_spread(self, pair):
         info = mt5.symbol_info(pair)
         if not info: return 0
         return info.spread
     
+    def get_open_positions(self):
+        if not self.check_connection(): return None
+        return mt5.positions_get()
+
+    def get_tick(self, pair):
+        return mt5.symbol_info_tick(pair)
+
     def fetch_candles(self, pair, timeframe, limit=300):
         if not self.check_connection(): return pd.DataFrame()
-        
-        tf_map = {
-            '1m': mt5.TIMEFRAME_M1,
-            '5m': mt5.TIMEFRAME_M5,
-            '15m': mt5.TIMEFRAME_M15,
-            '30m': mt5.TIMEFRAME_M30,
-            '1h': mt5.TIMEFRAME_H1,
-            '4h': mt5.TIMEFRAME_H4,
-            '1d': mt5.TIMEFRAME_D1,
-        }
-        
+        tf_map = {'1m': mt5.TIMEFRAME_M1, '5m': mt5.TIMEFRAME_M5, '15m': mt5.TIMEFRAME_M15, 
+                  '30m': mt5.TIMEFRAME_M30, '1h': mt5.TIMEFRAME_H1, '4h': mt5.TIMEFRAME_H4, '1d': mt5.TIMEFRAME_D1}
         mt5_tf = tf_map.get(timeframe, mt5.TIMEFRAME_M15)
-        
         rates = mt5.copy_rates_from_pos(pair, mt5_tf, 0, limit)
-        
-        if rates is None or len(rates) == 0:
-            return pd.DataFrame()
-            
+        if rates is None or len(rates) == 0: return pd.DataFrame()
         df = pd.DataFrame(rates)
         df['time'] = pd.to_datetime(df['time'], unit='s')
-        
         return df
 
     def execute_trade(self, pair, signal, volume, sl, tp, comment):
@@ -147,20 +126,12 @@ class BrokerAPI:
             print(f"❌ Order Failed ({pair}): {error_msg}")
             self.closed_markets[pair] = time.time() + 60 
             return None
-             
         return result
 
     def modify_position(self, ticket, sl, tp):
-        request = {
-            "action": mt5.TRADE_ACTION_SLTP,
-            "position": int(ticket),
-            "sl": float(sl),
-            "tp": float(tp),
-            "magic": 234000,
-        }
+        request = {"action": mt5.TRADE_ACTION_SLTP, "position": int(ticket), "sl": float(sl), "tp": float(tp), "magic": 234000}
         result = mt5.order_send(request)
-        if result is None:
-            return False
+        if result is None: return False
         return result.retcode == mt5.TRADE_RETCODE_DONE
 
     def close_trade(self, ticket, symbol, volume, is_long):
@@ -179,21 +150,23 @@ class BrokerAPI:
             "price": float(price),
             "deviation": 20,
             "magic": 234000,
-            "comment": "Bot Exit",
+            "comment": "Friday Close", # <--- This is vital for our auditor
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
         result = mt5.order_send(request)
-        if result is None:
-            return False
+        if result is None: return False
         return result.retcode == mt5.TRADE_RETCODE_DONE
 
     def check_trade_status(self, ticket):
+        """
+        Checks history to see if a trade is closed and WHY.
+        """
         positions = mt5.positions_get(ticket=int(ticket))
-        if positions:
-            return {'status': 'open'}
+        if positions: return {'status': 'open'}
 
         try:
+            # Look into the past...
             history = mt5.history_deals_get(position=int(ticket))
             if history:
                 total_profit = sum([d.profit + d.swap + d.commission for d in history])
@@ -203,9 +176,9 @@ class BrokerAPI:
                     'status': 'closed',
                     'pnl': round(total_profit, 2),
                     'exit_price': last_deal.price,
-                    'close_time': datetime.fromtimestamp(last_deal.time).isoformat()
+                    'close_time': datetime.fromtimestamp(last_deal.time).isoformat(),
+                    'comment': last_deal.comment # <--- The Clue!
                 }
         except Exception as e:
             print(f"⚠️ History Check Error: {e}")
-            
         return {'status': 'unknown'}
