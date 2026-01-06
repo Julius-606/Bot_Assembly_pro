@@ -1,4 +1,5 @@
 import os
+import sys
 
 # ==============================================================================
 # 🔐 SECRET SAUCE (CREDENTIALS)
@@ -69,5 +70,13 @@ TRAILING_CONFIG = {
     "sl_trailing_dist": 50 
 }
 
-# --- BROKER PATH ---
-MT5_PATH = r"C:\Program Files\MetaTrader 5\terminal64.exe"
+# --- BROKER PATH & OS DETECTION ---
+# If we are on Linux (usually detected by file structure or env), change path.
+# Note: Wine environment usually presents as 'win32' to Python, 
+# so we check for common Linux paths if the Windows default doesn't exist.
+
+MT5_PATH_WIN = r"C:\Program Files\MetaTrader 5\terminal64.exe"
+MT5_PATH_LINUX = r"C:\Program Files\MetaTrader 5\terminal64.exe" # Wine maps this internally
+
+# You can manually override this if your VM path is different
+MT5_PATH = MT5_PATH_WIN
