@@ -1,4 +1,6 @@
 import time
+import os
+import subprocess
 import MetaTrader5 as mt5
 import pandas as pd
 from datetime import datetime
@@ -15,26 +17,81 @@ class BrokerAPI:
 
     def startup(self):
         print(f"   🕵️  Scanning for MT5...")
+        
+        # 1. ATTEMPT NORMAL CONNECTION
+        if self._try_connect():
+            return True
+        
+        # 2. IF FAILED, DEPLOY THE BATTERING RAM
+        print("   ⚠️ Standard connection failed. Deploying HEADLESS BOOTLOADER...")
+        if self._force_launch_mt5():
+            print("   ⏳ Waiting for Headless MT5 to stabilize...")
+            time.sleep(15) # Give it time to log in
+            return self._try_connect()
+            
+        return False
+
+    def _try_connect(self):
+        """Standard Connection Attempt"""
         try:
-            if not mt5.initialize(path=MT5_PATH, timeout=60000):
-                print(f"   ⚠️ Generic initialize failed. Trying without path...")
-                if not mt5.initialize():
-                    print(f"   ❌ FATAL: Could not init MT5. Error: {mt5.last_error()}")
-                    return False
+            # We use the path specifically
+            if not mt5.initialize(path=MT5_PATH, timeout=20000): # 20s timeout
+                return False
+            
+            # Login Check
+            print(f"   🔑 Authenticating with account {MT5_LOGIN}...")
+            authorized = mt5.login(login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
+            
+            if authorized:
+                print(f"   ✅ Login Successful!")
+                if not mt5.terminal_info().trade_allowed:
+                    print("   ⚠️ WARNING: 'Algo Trading' disabled! (Will try to fix via Config)")
+                return self._verify_connection()
+            else:
+                print(f"   ❌ Login Failed: {mt5.last_error()}")
+                return False
         except Exception as e:
-            print(f"   ❌ Init Exception: {e}")
+            print(f"   ❌ Connection Exception: {e}")
             return False
 
-        print(f"   🔑 Authenticating with account {MT5_LOGIN}...")
-        authorized = mt5.login(login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
-        
-        if authorized:
-            print(f"   ✅ Login Successful!")
-            if not mt5.terminal_info().trade_allowed:
-                print("   ⚠️ WARNING: 'Algo Trading' is disabled in Terminal!")
-            return self._verify_connection()
-        else:
-            print(f"   ❌ Login Failed. Error Code: {mt5.last_error()}")
+    def _force_launch_mt5(self):
+        """
+        The Nuclear Option ☢️
+        Generates a boot.ini file with credentials and 'ExpertsEnabled=1',
+        then launches MT5 forcefully with this config.
+        """
+        try:
+            # 1. Create the magic config file
+            ini_content = f"""
+[Common]
+Login={MT5_LOGIN}
+Password={MT5_PASSWORD}
+Server={MT5_SERVER}
+CertPassword=
+ProxyEnable=0
+ExpertsEnabled=1
+NewsEnable=0
+"""
+            # Save it next to where we are running
+            boot_file = os.path.abspath("boot.ini")
+            with open(boot_file, "w") as f:
+                f.write(ini_content)
+            
+            print(f"   📝 Generated Boot Config at: {boot_file}")
+
+            # 2. Construct the Launch Command
+            # We use /portable to keep data clean and /config to force settings
+            cmd = [MT5_PATH, "/portable", f"/config:{boot_file}"]
+            
+            print(f"   🚀 Launching: {' '.join(cmd)}")
+            
+            # 3. Fire in the hole!
+            # We use subprocess.Popen so we don't wait for it to close (it needs to stay open)
+            subprocess.Popen(cmd)
+            
+            return True
+        except Exception as e:
+            print(f"   ❌ Bootloader Failed: {e}")
             return False
 
     def _verify_connection(self):
@@ -45,11 +102,9 @@ class BrokerAPI:
                 self.connected = True
                 return True
             else:
-                print("   ⚠️ Connected to Terminal, but NO Account Info found.")
+                print("   ⚠️ Connected, but NO Account Info.")
                 return False
-        except Exception as e:
-            print(f"   ❌ Verification Crash: {e}")
-            return False
+        except: return False
 
     def check_connection(self):
         return mt5.terminal_info() is not None
@@ -150,7 +205,7 @@ class BrokerAPI:
             "price": float(price),
             "deviation": 20,
             "magic": 234000,
-            "comment": "Friday Close", # <--- This is vital for our auditor
+            "comment": "Friday Close",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
         }
@@ -159,25 +214,20 @@ class BrokerAPI:
         return result.retcode == mt5.TRADE_RETCODE_DONE
 
     def check_trade_status(self, ticket):
-        """
-        Checks history to see if a trade is closed and WHY.
-        """
         positions = mt5.positions_get(ticket=int(ticket))
         if positions: return {'status': 'open'}
 
         try:
-            # Look into the past...
             history = mt5.history_deals_get(position=int(ticket))
             if history:
                 total_profit = sum([d.profit + d.swap + d.commission for d in history])
                 last_deal = history[-1]
-                
                 return {
                     'status': 'closed',
                     'pnl': round(total_profit, 2),
                     'exit_price': last_deal.price,
                     'close_time': datetime.fromtimestamp(last_deal.time).isoformat(),
-                    'comment': last_deal.comment # <--- The Clue!
+                    'comment': last_deal.comment
                 }
         except Exception as e:
             print(f"⚠️ History Check Error: {e}")
