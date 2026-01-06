@@ -1,51 +1,62 @@
-**🐙 Money Maker (MainFrame V3.0)**
+🐙 Money Maker (Trend Runner V3.0)
 
-> "From Trade Executioner to Cloud Accountant."
+"Because sleeping is for people who don't like money."
 
-Money Maker is a modular, cloud-native trading bot designed to run autonomously on GitHub Actions. It has evolved from a Windows-dependent script to a robust, API-first system that tracks trades, manages risk, and logs everything to the cloud.
+Welcome to the Money Maker, a next-gen, cloud-native trading fortress. This isn't just a script; it's a modular algorithmic ecosystem designed to hunt trends on Forex and Crypto markets while you're busy living your best life (or debugging other code).
 
-📜 History
+🌟 What Makes It Special?
 
-V1.0 (The Terminal Era): Dependent on terminal64.exe (MetaTrader 5). Windows only. Heavy resource usage.
+☁️ Cloud Native: Persistence via Google Drive and logging via Google Sheets. It remembers its state even if the server explodes.
 
-V1.5 (Cloud Awakening): Migrated to API-based logic. Headless operation. GitHub Actions integration.
+🐧 Linux Ready: Optimized for Headless VMs using Wine. It logs in automatically and enables Algo Trading without you lifting a finger.
 
-V2.0 (The CPA Update): Added sophisticated accounting, "Real Life" PnL tracking, and smart trailing stops.
+📱 Telegram Command Center: Control your bot from the beach.
 
-V3.0 (Modular & Live): Fully modular code structure (src/), ImgBB integration for charts, and Real Market Data via Yahoo Finance.
+/pause: Freezes new entries (but manages open trades).
 
-🧠 Strategy & Logic
+/resume: Back to the hunt.
 
-The bot uses a Hybrid Regime Filter powered by ADX:
+/status: Instant PnL and position report.
 
-Trending (ADX > 25): Deploys SR_TREND (Breakout) + SCALPER (MACD/EMA).
+🧠 Trend Runner Strategy: A sophisticated Hybrid Regime Filter using ADX, RSI, and ATR to distinguish between choppy noise and massive trend runs.
 
-Ranging (ADX < 25): Deploys MEAN_REVERT (Bollinger Bands + RSI).
+📜 The Architecture
 
-It features a "Time Traveler" logic to handle the latency of Cron jobs, checking historical price action to see if TP/SL levels were hit while it was "asleep."
+src/ (The Engine Room)
 
-🛠️ Tech Stack
+broker.py: The diplomat. It speaks MetaTrader5 fluently, handling connections, logins, and order execution.
 
-Language: Python 3.10
+cloud.py: The accountant. Manages the JSON memory file and logs every single trade to Google Sheets for post-game analysis.
 
-Execution: GitHub Actions (Cron)
+strategy.py: The brain. Calculates indicators (EMA, RSI, ATR) and decides when to pull the trigger.
 
-Data Source: Yahoo Finance (yfinance)
+telegram_bot.py: The messenger. Keeps you in the loop with real-time alerts.
 
-Storage: Google Sheets (State Persistence & Logging)
+🛠️ Setup & Deployment
 
-Visuals: ImgBB (Chart hosting)
+Clone the Repo:
 
-Libraries: pandas, mplfinance, gspread, python-telegram-bot
+git clone [https://github.com/your-repo/money-maker-v3.git](https://github.com/your-repo/money-maker-v3.git)
 
-🚀 Deployment
 
-Clone the repository.
+Install Dependencies:
 
-Add your google_creds.json content to config.py (or use GitHub Secrets).
+pip install -r requirements.txt
 
-Add your ImgBB API Key to config.py.
 
-Push to main branch to activate the workflow.
+Config:
 
-⚠️ Warning: This bot is designed for educational and simulation purposes. Use at your own risk with real funds.
+Open config.py and add your Google Cloud credentials JSON.
+
+Ensure your MT5 Login/Pass is correct (supports FBS-Demo out of the box).
+
+Run It:
+
+python main.py
+
+
+⚠️ Disclaimer
+
+This software is for educational purposes. Trading financial markets involves risk. Don't trade with money you can't afford to lose, and definitely don't blame the bot if the market decides to do a backflip.
+
+"May your PnL be green and your drawdowns be shallow." 🚀
