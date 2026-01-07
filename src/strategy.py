@@ -12,7 +12,7 @@ class Strategy:
     Encapsulates logic for Trend Following.
     """
     def __init__(self):
-        self.name = "Trend Runner v1.1 (Relaxed)"
+        self.name = "Trend Runner v1.2 (Loose Cannon)"
 
     # ==============================================================================
     # 🧠 INDICATORS
@@ -20,8 +20,8 @@ class Strategy:
     def calc_indicators(self, df, params):
         if df.empty: return df
         
-        # Allow config to override EMA period if set
-        ema_p = params.get('ema_period', 200)
+        # 🛠️ TUNING V2: Default EMA dropped to 100 for faster trend detection
+        ema_p = params.get('ema_period', 100)
         
         # 1. THE TREND FILTER (EMA)
         df['ema_200'] = df['close'].ewm(span=ema_p, adjust=False).mean()
@@ -45,30 +45,32 @@ class Strategy:
     # ⚔️ STRATEGY LOGIC
     # ==============================================================================
     def check_trend_runner(self, pair, df, params):
-        if len(df) < 200: return None, None, None, None
+        if len(df) < 150: return None, None, None, None # Lowered requirement for 100 EMA
         
         curr = df.iloc[-1]
         atr = curr['atr'] if curr['atr'] > 0 else 0.0010
         
-        # 🛠️ TUNING UPDATE: 
-        # Reduced lookback from 21 (5.25h) to 12 (3h) for more frequency
-        recent_high = df['high'].iloc[-12:-1].max()
-        recent_low = df['low'].iloc[-12:-1].min()
+        # 🛠️ TUNING V2: 
+        # Lookback reduced to 8 candles (2 Hours)
+        # We want to catch the move early.
+        recent_high = df['high'].iloc[-8:-1].max()
+        recent_low = df['low'].iloc[-8:-1].min()
         
         # --- LONG SETUP (BUY) ---
-        # Relaxed RSI from <70 to <75 to catch strong momentum
+        # RSI Constraint relaxed significantly (< 90). 
+        # We only avoid entry if price is vertically screaming.
         if (curr['close'] > curr['ema_200']) and \
            (curr['close'] > recent_high) and \
-           (curr['rsi'] < 75):
+           (curr['rsi'] < 90):
                sl = curr['close'] - (atr * 2.0)
                tp = curr['close'] + (atr * 4.0) 
                return 'BUY', sl, tp, 'TREND_RUNNER'
 
         # --- SHORT SETUP (SELL) ---
-        # Relaxed RSI from >30 to >25
+        # RSI Constraint relaxed significantly (> 10).
         if (curr['close'] < curr['ema_200']) and \
            (curr['close'] < recent_low) and \
-           (curr['rsi'] > 25):
+           (curr['rsi'] > 10):
                sl = curr['close'] + (atr * 2.0)
                tp = curr['close'] - (atr * 4.0)
                return 'SELL', sl, tp, 'TREND_RUNNER'
