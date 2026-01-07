@@ -12,7 +12,7 @@ class Strategy:
     Encapsulates logic for Trend Following.
     """
     def __init__(self):
-        self.name = "Trend Runner v1"
+        self.name = "Trend Runner v1.1 (Relaxed)"
 
     # ==============================================================================
     # 🧠 INDICATORS
@@ -20,8 +20,11 @@ class Strategy:
     def calc_indicators(self, df, params):
         if df.empty: return df
         
-        # 1. THE TREND FILTER (200 EMA)
-        df['ema_200'] = df['close'].ewm(span=200, adjust=False).mean()
+        # Allow config to override EMA period if set
+        ema_p = params.get('ema_period', 200)
+        
+        # 1. THE TREND FILTER (EMA)
+        df['ema_200'] = df['close'].ewm(span=ema_p, adjust=False).mean()
         
         # 2. VOLATILITY (ATR)
         df['tr0'] = abs(df['high'] - df['low'])
@@ -46,21 +49,26 @@ class Strategy:
         
         curr = df.iloc[-1]
         atr = curr['atr'] if curr['atr'] > 0 else 0.0010
-        recent_high = df['high'].iloc[-21:-1].max()
-        recent_low = df['low'].iloc[-21:-1].min()
+        
+        # 🛠️ TUNING UPDATE: 
+        # Reduced lookback from 21 (5.25h) to 12 (3h) for more frequency
+        recent_high = df['high'].iloc[-12:-1].max()
+        recent_low = df['low'].iloc[-12:-1].min()
         
         # --- LONG SETUP (BUY) ---
+        # Relaxed RSI from <70 to <75 to catch strong momentum
         if (curr['close'] > curr['ema_200']) and \
            (curr['close'] > recent_high) and \
-           (curr['rsi'] < 70):
+           (curr['rsi'] < 75):
                sl = curr['close'] - (atr * 2.0)
                tp = curr['close'] + (atr * 4.0) 
                return 'BUY', sl, tp, 'TREND_RUNNER'
 
         # --- SHORT SETUP (SELL) ---
+        # Relaxed RSI from >30 to >25
         if (curr['close'] < curr['ema_200']) and \
            (curr['close'] < recent_low) and \
-           (curr['rsi'] > 30):
+           (curr['rsi'] > 25):
                sl = curr['close'] + (atr * 2.0)
                tp = curr['close'] - (atr * 4.0)
                return 'SELL', sl, tp, 'TREND_RUNNER'
