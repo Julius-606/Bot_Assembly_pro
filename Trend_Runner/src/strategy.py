@@ -12,7 +12,7 @@ class Strategy:
     Encapsulates logic for Trend Following.
     """
     def __init__(self):
-        self.name = "Trend Runner v1.3 (Agile)"
+        self.name = "Trend Runner v1.4 (Risk Clamped)"
 
     # ==============================================================================
     # 🧠 INDICATORS
@@ -55,26 +55,36 @@ class Strategy:
         df = self.calc_indicators(df, params)
         curr = df.iloc[-1]
         atr = curr['atr']
+        price = curr['close']
         
-        # Recent High/Low structure
-        # 🛠️ TUNING: Reduced lookback from 8 to 5 candles for faster entries
+        # Recent High/Low structure (5 candle lookback)
         recent_high = df['high'].iloc[-6:-1].max()
         recent_low = df['low'].iloc[-6:-1].min()
+        
+        # 🛡️ RISK CLAMP: SL cannot exceed 1% of price
+        # This prevents the "Gold blew my account" scenario
+        max_sl_dist = price * 0.01 
+        
+        # Calculated ATR SL
+        raw_sl_dist = atr * 2.0
+        
+        # Use the smaller of the two
+        final_sl_dist = min(raw_sl_dist, max_sl_dist)
         
         # --- LONG SETUP (BUY) ---
         if (curr['close'] > curr['ema_200']) and \
            (curr['close'] > recent_high) and \
-           (curr['rsi'] < 85): # Relaxed RSI cap
-               sl = curr['close'] - (atr * 2.0)
-               tp = curr['close'] + (atr * 4.0) 
+           (curr['rsi'] < 85): 
+               sl = curr['close'] - final_sl_dist
+               tp = curr['close'] + (final_sl_dist * 2.0) # 1:2 RR
                return 'BUY', sl, tp, 'TREND_RUNNER'
 
         # --- SHORT SETUP (SELL) ---
         if (curr['close'] < curr['ema_200']) and \
            (curr['close'] < recent_low) and \
-           (curr['rsi'] > 15): # Relaxed RSI floor
-               sl = curr['close'] + (atr * 2.0)
-               tp = curr['close'] - (atr * 4.0)
+           (curr['rsi'] > 15): 
+               sl = curr['close'] + final_sl_dist
+               tp = curr['close'] - (final_sl_dist * 2.0)
                return 'SELL', sl, tp, 'TREND_RUNNER'
 
         return None, None, None, None

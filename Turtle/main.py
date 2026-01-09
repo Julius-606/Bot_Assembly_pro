@@ -19,7 +19,6 @@ try:
     from src.broker import BrokerAPI 
     from src.strategy import Strategy
     from src.telegram_bot import TelegramBot
-    # Added MAX_OPEN_TRADES for the Risk Guard 🛡️
     from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES
     print("✅ The squad is assembled.")
 except ImportError as e:
@@ -53,9 +52,32 @@ def audit_trades(broker, cloud, tg_bot):
                 cloud.deregister_trade(ticket)
                 tg_bot.send_msg(f"💰 TRADE CLOSED: {trade['pair']}\nPnL: {trade['pnl']}")
 
+def check_weekend_chill(broker, cloud, tg_bot):
+    """
+    🏖️ The Friday Chill Protocol
+    Closes all Forex trades on Friday evening (after 20:00).
+    Keeps Crypto running.
+    """
+    now = datetime.now()
+    if now.weekday() == 4 and now.hour >= 20:
+        open_trades = cloud.state.get('open_bot_trades', [])
+        for trade in open_trades[:]:
+            pair = trade['pair']
+            if pair not in CRYPTO_MARKETS:
+                print(f"   🏖️ Weekend Chill: Closing {pair}...")
+                is_long = trade['signal'] == 'BUY'
+                if broker.close_trade(trade['ticket'], pair, trade['volume'], is_long):
+                    tg_bot.send_msg(f"🏖️ WEEKEND EXIT: {pair}")
+                    cloud.deregister_trade(trade['ticket'])
+                    cloud.log_trade(trade, reason="FRIDAY_CLOSE")
+        return True
+    return False
+
 def main():
-    print("\n🚀 INITIALIZING TURTLE V1.0...")
+    # 🛠️ FIXED IDENTITY
+    print("\n🚀 INITIALIZING TURTLE V1.1...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
+    print("   🏖️ Weekend Protocol: ACTIVE")
     
     # 1. Initialize Components
     my_cloud = CloudManager()
@@ -90,6 +112,9 @@ def main():
 
             # Audit existing trades
             audit_trades(my_broker, my_cloud, tg_bot)
+            
+            # Check Weekend Protocol
+            is_weekend_chill = check_weekend_chill(my_broker, my_cloud, tg_bot)
 
             # If paused, skip analysis
             if my_cloud.state.get('status') == 'paused':
@@ -99,19 +124,21 @@ def main():
             # --- 🛡️ RISK GUARD: MAX TRADES CHECK ---
             current_open_trades = my_cloud.state.get('open_bot_trades', [])
             if len(current_open_trades) >= MAX_OPEN_TRADES:
-                # We are full, just wait.
                 time.sleep(10)
                 continue
 
-            # List of pairs we are ALREADY trading to prevent duplicates
             active_trade_pairs = [t['pair'] for t in current_open_trades]
 
             # Market Scan
             active_pairs = my_cloud.state.get('active_pairs', [])
             for pair in active_pairs:
                 
-                # 🛑 DUPLICATE CHECK: Don't double dip!
+                # 🛑 DUPLICATE CHECK
                 if pair in active_trade_pairs:
+                    continue
+
+                # 🏖️ WEEKEND FILTER
+                if is_weekend_chill and pair not in CRYPTO_MARKETS:
                     continue
 
                 try:
@@ -131,7 +158,12 @@ def main():
                         if result:
                             server_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             print(f"   ✅ Trade Executed! Ticket: {result.order}")
-                            tg_bot.send_msg(f"🚀 ENTRY: {pair} {signal}\nSL: {sl}\nTP: {tp}")
+                            
+                            # 🛠️ ROUNDING FOR MESSAGE
+                            clean_sl = round(sl, 5)
+                            clean_tp = round(tp, 5)
+                            
+                            tg_bot.send_msg(f"🚀 ENTRY: {pair} {signal}\nSL: {clean_sl}\nTP: {clean_tp}")
 
                             trade_data = {
                                 'ticket': result.order,
@@ -152,10 +184,8 @@ def main():
                             # Save to Memory for the Auditor
                             my_cloud.register_trade(trade_data)
                             
-                            # Add to local list immediately to prevent double buy in same loop
                             active_trade_pairs.append(pair)
                             
-                            # Re-check max trades immediately
                             if len(my_cloud.state.get('open_bot_trades', [])) >= MAX_OPEN_TRADES:
                                 break 
 

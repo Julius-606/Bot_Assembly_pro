@@ -15,10 +15,6 @@ from config import (
 )
 
 class CloudManager:
-    """
-    The Brain 🧠
-    Handles Google Sheets logging and Drive memory persistence.
-    """
     def __init__(self):
         self.sheets_client = None
         self.drive_service = None
@@ -49,8 +45,7 @@ class CloudManager:
             self.sheets_client = gspread.authorize(creds)
             self.drive_service = build('drive', 'v3', credentials=creds)
             print("   ☁️  Connected to Google Cloud.")
-            print(f"   📧 CRITICAL: Share '{SHEET_URL}' with:")
-            print(f"      {creds.service_account_email}")
+            print(f"   📧 Service Account: {creds.service_account_email}")
         except Exception as e:
             print(f"   ⚠️ Cloud Setup Failed: {e}")
 
@@ -114,23 +109,42 @@ class CloudManager:
         self.save_memory()
 
     def log_trade(self, trade, reason="OPEN"):
-        if not self.sheets_client: return
+        if not self.sheets_client: 
+            print("   ⚠️ Logger Snitch: No Sheets Client available!")
+            return
+            
         try:
+            print(f"   📝 Logger Snitch: Attempting to write to {SHEET_URL}...")
+            
             sheet = self.sheets_client.open_by_url(SHEET_URL)
             try: ws = sheet.worksheet(WORKSHEET_LOGS)
             except: 
-                print(f"   📝 Creating new worksheet: {WORKSHEET_LOGS}...")
+                print(f"   📝 Logger Snitch: Worksheet '{WORKSHEET_LOGS}' not found, creating it...")
                 ws = sheet.add_worksheet(title=WORKSHEET_LOGS, rows=1000, cols=20)
-                ws.append_row(["Ticket", "Strategy", "Signal", "Pair", "Time", "Entry", "SL", "TP", "Vol", "Spread", "Exit", "Close Time", "PnL", "Balance", "Reason"])
+                ws.append_row(["Ticket", "Strategy", "Signal", "Pair", "Log Time", "Time", "Entry", "SL", "TP", "Vol", "Spread", "Exit", "Close Time", "PnL", "Balance", "Reason"])
             
             status_id = str(trade.get('ticket', 'UNKNOWN'))
+            log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
             row = [
-                status_id, trade.get('strategy', 'Unknown'), trade.get('signal', 'Unknown'), trade.get('pair', 'Unknown'),
-                trade.get('open_time', ''), trade.get('entry_price', 0), trade.get('stop_loss_price', 0), trade.get('take_profit_price', 0),
-                trade.get('volume', 0), trade.get('spread', 0), trade.get('exit_price', 0), trade.get('close_time', ''),
-                trade.get('pnl', 0), f"{self.state.get('current_balance', 0)}", reason
+                status_id, 
+                str(trade.get('strategy', 'Unknown')), 
+                str(trade.get('signal', 'Unknown')), 
+                str(trade.get('pair', 'Unknown')),
+                log_time,
+                str(trade.get('open_time', '')), 
+                float(trade.get('entry_price', 0)), 
+                float(trade.get('stop_loss_price', 0)), 
+                float(trade.get('take_profit_price', 0)),
+                float(trade.get('volume', 0)), 
+                float(trade.get('spread', 0)),
+                float(trade.get('exit_price', 0)),
+                str(trade.get('close_time', '')),
+                float(trade.get('pnl', 0)), 
+                f"{self.state.get('current_balance', 0)}",
+                str(reason)
             ]
             ws.append_row(row)
-            print(f"   📊 Logged trade {status_id} to Sheets.")
+            print(f"   ✅ Logger Snitch: Trade {status_id} successfully written!")
         except Exception as e:
-            print(f"   ⚠️ Log to Sheet Failed: {e}")
+            print(f"   ❌ Logger Snitch: FAILED! Reason: {e}")

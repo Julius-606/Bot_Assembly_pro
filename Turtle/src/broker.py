@@ -106,7 +106,7 @@ class BrokerAPI:
         tick = mt5.symbol_info_tick(symbol)
         price = tick.ask if is_long else tick.bid
         
-        # NORMALIZE (The fix for "Invalid stops")
+        # NORMALIZE
         price = round(price, digits)
         sl = round(sl, digits)
         tp = round(tp, digits)
@@ -132,6 +132,35 @@ class BrokerAPI:
             print(f"   ❌ Trade Failed: {result.comment}")
             return None
         return result
+
+    # 🛠️ ADDED CLOSE_TRADE METHOD (Required for Weekend Chill)
+    def close_trade(self, ticket, symbol, volume, is_long):
+        # Close opposite to open
+        type_op = mt5.ORDER_TYPE_SELL if is_long else mt5.ORDER_TYPE_BUY
+        
+        # Use simple tick request to get price (safer than symbol_info_tick in some loops)
+        tick = mt5.symbol_info_tick(symbol)
+        if not tick: return False
+        price = tick.bid if is_long else tick.ask
+        
+        fill_mode = self.get_filling_mode(symbol)
+
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": float(volume),
+            "type": type_op,
+            "position": int(ticket),
+            "price": float(price),
+            "deviation": 20,
+            "magic": 234000,
+            "comment": "Friday Close",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": fill_mode, 
+        }
+        result = mt5.order_send(request)
+        if result is None: return False
+        return result.retcode == mt5.TRADE_RETCODE_DONE
         
     def check_trade_status(self, ticket):
         positions = mt5.positions_get(ticket=int(ticket))
