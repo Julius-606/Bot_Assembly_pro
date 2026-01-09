@@ -2,6 +2,8 @@ import os
 import sys
 
 # ==============================================================================
+# ---- Turtle Strat ----
+# ==============================================================================
 # 🔐 SECRET SAUCE (CREDENTIALS)
 # ==============================================================================
 
@@ -9,9 +11,10 @@ TELEGRAM_BOT_TOKEN = "8141234434:AAFaO3z4NCASSFYwYkH4t1Q4lkA0Us7x_qA"
 TELEGRAM_CHAT_ID = "6882899041"
 
 # --- MT5 SPECIFIC LOGINS ---
-MT5_LOGIN = 105473947
-MT5_PASSWORD = ":+xLBl3B"
+MT5_LOGIN = 105144696
+MT5_PASSWORD = "(yeVM<s4"
 MT5_SERVER = "FBS-Demo"
+MT5_PATH = r"C:\Program Files\MetaTrader 5 - Turtle\terminal64.exe"
 
 # --- GOOGLE CLOUD CONFIG ---
 GOOGLE_CREDS = r"""
@@ -30,12 +33,18 @@ GOOGLE_CREDS = r"""
 }
 """
 
+# 🎯 THE BRAIN NURSERY LINK
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
-WORKSHEET_LOGS = "Sheet1"
-MEMORY_FILENAME = "mainframe_memory.json"
+WORKSHEET_LOGS = "Trade_Logs"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
+MEMORY_FILENAME = "turtle_memory.json"
 
-DEFAULT_STRATEGY = "TREND_RUNNER"
+DEFAULT_STRATEGY = "TURTLE"
+BOT_IDENTITY = "turtle"
+
+# --- RISK MANAGEMENT 🛡️ ---
+FIXED_LOT_SIZE = 0.01 
+MAX_OPEN_TRADES = 5 
 
 # --- MARKET CLASSIFICATION ---
 USER_DEFAULT_MARKETS = [
@@ -44,39 +53,20 @@ USER_DEFAULT_MARKETS = [
     "USDCHF", "XAGUSD"
 ]
 
-# 24/7 Markets (Do not close on Friday)
 CRYPTO_MARKETS = ["BTCUSD", "ETHUSD", "LTCUSD"]
 
-# --- STRATEGY PARAMETERS ---
+# --- TURTLE PARAMETERS ---
 DEFAULT_PARAMS = {
-    "ema_period": 200,
-    "rsi_period": 14,
-    "atr_period": 14,
+    "donchian_period": 20, 
+    "ema_filter": 50,      
+    "atr_period": 20,
     "risk_per_trade": 0.01
 }
 
 # --- RUNNER LOGIC (TRAILING) ---
-# All values in "points" (usually pips * 10 for forex, or raw price for crypto)
-# Adjust these based on your broker's digits!
 TRAILING_CONFIG = {
-    # If price gets within 50 points (5 pips) of TP...
     "tp_proximity_threshold": 50, 
-    # ...Push TP away by 200 points (20 pips)
     "tp_extension": 200,
-    
-    # If price moves 100 points (10 pips) in profit...
     "sl_activation_distance": 100, 
-    # ...Set SL 50 points behind price
-    "sl_trailing_dist": 50 
+    "sl_distance": 50
 }
-
-# --- BROKER PATH & OS DETECTION ---
-# If we are on Linux (usually detected by file structure or env), change path.
-# Note: Wine environment usually presents as 'win32' to Python, 
-# so we check for common Linux paths if the Windows default doesn't exist.
-
-MT5_PATH_WIN = r"C:\Program Files\MetaTrader 5\terminal64.exe"
-MT5_PATH_LINUX = r"C:\Program Files\MetaTrader 5\terminal64.exe" # Wine maps this internally
-
-# You can manually override this if your VM path is different
-MT5_PATH = MT5_PATH_WIN

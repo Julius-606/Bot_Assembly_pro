@@ -1,62 +1,93 @@
-🐙 Money Maker (Trend Runner V3.0)
+🐙 Money Maker Algo Suite
 
 "Because sleeping is for people who don't like money."
 
-Welcome to the Money Maker, a next-gen, cloud-native trading fortress. This isn't just a script; it's a modular algorithmic ecosystem designed to hunt trends on Forex and Crypto markets while you're busy living your best life (or debugging other code).
+Welcome to the Money Maker Suite, a modular, cloud-native algorithmic trading ecosystem designed for MetaTrader 5. This repository houses multiple autonomous trading bots, each running its own unique strategy while sharing a common robust infrastructure.
 
-🌟 What Makes It Special?
+📂 Repository Structure
 
-☁️ Cloud Native: Persistence via Google Drive and logging via Google Sheets. It remembers its state even if the server explodes.
+The suite is organized by strategy. Each folder is a self-contained bot instance.
 
-🐧 Linux Ready: Optimized for Headless VMs using Wine. It logs in automatically and enables Algo Trading without you lifting a finger.
+Bot_Assembly_pro/
+│
+├── requirements.txt       # Global dependencies for all bots
+├── README.md              # You are here
+├── .gitignore             # Security rules (Ignores logs, creds, memory)
+│
+├── Trend_Runner/          # 🏃‍♂️ STRATEGY 1: Trend Following
+│   ├── main.py            # Entry point
+│   ├── config.py          # Settings & Credentials
+│   └── src/               # Core Logic (Broker, Cloud, Strategy)
+│
+└── Turtle/                # 🐢 STRATEGY 2: Donchian Breakout
+    ├── main.py            # Entry point
+    ├── config.py          # Settings & Credentials
+    └── src/               # Core Logic (Broker, Cloud, Strategy)
 
-📱 Telegram Command Center: Control your bot from the beach.
 
-/pause: Freezes new entries (but manages open trades).
+🌟 Core Features (Shared)
 
-/resume: Back to the hunt.
+☁️ Cloud Native: Persistence via Google Drive and logging via Google Sheets.
 
-/status: Instant PnL and position report.
+🛡️ Risk Guard: Built-in protection against over-trading (MAX_OPEN_TRADES) and account blowouts (FIXED_LOT_SIZE).
 
-🧠 Trend Runner Strategy: A sophisticated Hybrid Regime Filter using ADX, RSI, and ATR to distinguish between choppy noise and massive trend runs.
+📱 Telegram Command Center: Individual control for each bot.
 
-📜 The Architecture
+/assemble: Global status report.
 
-src/ (The Engine Room)
+/trendrunner [pause/resume]: Controls Trend Runner.
 
-broker.py: The diplomat. It speaks MetaTrader5 fluently, handling connections, logins, and order execution.
+/turtle [pause/resume]: Controls Turtle.
 
-cloud.py: The accountant. Manages the JSON memory file and logs every single trade to Google Sheets for post-game analysis.
+🚀 Strategies
 
-strategy.py: The brain. Calculates indicators (EMA, RSI, ATR) and decides when to pull the trigger.
+1. Trend Runner (Trend_Runner/)
 
-telegram_bot.py: The messenger. Keeps you in the loop with real-time alerts.
+Type: Hybrid Regime Filter (Trend Following)
+
+Logic: Uses EMA 200 for trend direction, RSI for momentum, and a Recent High/Low breakout confirmation.
+
+Best For: Strong trending markets (Forex/Crypto).
+
+Timeframe: M15
+
+2. The Turtle (Turtle/)
+
+Type: Classic Donchian Channel Breakout (System 1 Modified)
+
+Logic: Enters when price breaks the 20-period High/Low. Filtered by EMA 50 to ensure we trade with the trend.
+
+Best For: Catching massive breakouts early.
+
+Timeframe: M15
 
 🛠️ Setup & Deployment
 
-Clone the Repo:
-
-git clone [https://github.com/your-repo/money-maker-v3.git](https://github.com/your-repo/money-maker-v3.git)
-
-
-Install Dependencies:
+Environment:
+Ensure you have Python 3.10+ and MetaTrader 5 installed.
 
 pip install -r requirements.txt
 
 
-Config:
+Configuration:
 
-Open config.py and add your Google Cloud credentials JSON.
+Trend Runner: Edit Trend_Runner/config.py. Update MT5_PATH and GOOGLE_CREDS.
 
-Ensure your MT5 Login/Pass is correct (supports FBS-Demo out of the box).
+Turtle: Edit Turtle/config.py. Update MT5_PATH and GOOGLE_CREDS.
 
-Run It:
+Running the Bots:
+You can run them in separate terminals:
 
+Terminal A (Trend Runner):
+
+cd Trend_Runner
+python main.py
+
+
+Terminal B (Turtle):
+
+cd Turtle
 python main.py
 
 
 ⚠️ Disclaimer
-
-This software is for educational purposes. Trading financial markets involves risk. Don't trade with money you can't afford to lose, and definitely don't blame the bot if the market decides to do a backflip.
-
-"May your PnL be green and your drawdowns be shallow." 🚀

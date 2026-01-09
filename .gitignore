@@ -1,0 +1,21 @@
+🙈 IGNORE LIST
+
+pycache/
+*.py[cod]
+*$py.class
+
+🔧 MT5 & Environment
+
+venv/
+.env
+.DS_Store
+
+☁️ Cloud Credentials (NEVER COMMIT THESE)
+
+bot_memory_*.json
+*.json
+credentials.json
+
+📉 Logs
+
+*.log
