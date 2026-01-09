@@ -33,7 +33,6 @@ GOOGLE_CREDS = r"""
 }
 """
 
-# 🎯 THE BRAIN NURSERY LINK
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
 WORKSHEET_LOGS = "Trade_Logs"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
@@ -50,10 +49,15 @@ MAX_OPEN_TRADES = 5
 USER_DEFAULT_MARKETS = [
     "EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD",
     "ETHUSD", "LTCUSD", "AUDUSD", "NZDUSD", "USDCAD", 
-    "USDCHF", "XAGUSD"
+    "USDCHF", "XAGUSD",
+    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD" # 🚀 New Squad
 ]
 
-CRYPTO_MARKETS = ["BTCUSD", "ETHUSD", "LTCUSD"]
+# 24/7 Markets (Do not close on Friday)
+CRYPTO_MARKETS = [
+    "BTCUSD", "ETHUSD", "LTCUSD", 
+    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD" # 🚀 Weekend Pass
+]
 
 # --- TURTLE PARAMETERS ---
 DEFAULT_PARAMS = {
