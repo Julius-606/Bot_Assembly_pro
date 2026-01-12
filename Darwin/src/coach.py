@@ -36,9 +36,12 @@ class Coach:
             self.model = None
             
         # Calibration Settings
-        self.lookback_trades = 20 # Analyze last 20 trades per pair
+        self.lookback_trades = 20 # Analyze last 20 CLOSED trades
         self.panic_threshold = 0.3 # If Win Rate < 30%, something is wrong
         self.bench_duration = 4 # Hours to bench a pair
+        
+        # 🛑 STRICT FILTER: Only look at these rows for analysis
+        self.VALID_EXIT_REASONS = ['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT', 'FRIDAY_CLOSE']
 
     def fetch_game_tape(self):
         """Reads trade history from Google Sheets via CloudManager."""
@@ -68,8 +71,8 @@ class Coach:
             # Force numeric, coercion turns errors to NaN
             df[c] = pd.to_numeric(df[c], errors='coerce')
         
-        # Filter for recent closed trades only
-        closed = df[df['Reason'].isin(['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT', 'FRIDAY_CLOSE'])]
+        # 🔍 STRICT FILTERING: Only closed trades
+        closed = df[df['Reason'].isin(self.VALID_EXIT_REASONS)]
         
         if closed.empty:
             print("   🧢 Coach: No closed trades to analyze yet.")
@@ -144,12 +147,19 @@ class Coach:
         
         # 1. Gather Data
         df = self.fetch_game_tape()
-        if df.empty or len(df) < 5: 
+        if df.empty: 
             print("   🧢 Not enough data for AI yet.")
             return
 
-        # Filter for recent closed trades
-        closed = df[df['Reason'].isin(['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT'])]
+        # 🛑 STRICT FILTER: Remove 'OPEN' trades, keep only Exits
+        # 'FRIDAY_CLOSE', 'TP_HIT', 'SL_HIT', 'CLOSED_BY_BROKER'
+        closed = df[df['Reason'].isin(self.VALID_EXIT_REASONS)]
+        
+        if len(closed) < 5:
+            print(f"   🧢 Need more closed trades (Found {len(closed)}/5 minimum).")
+            return
+
+        # Grab the last 20 CLOSED trades
         recent_history = closed.tail(self.lookback_trades).to_json(orient='records')
         
         # 2. Construct Prompt
@@ -161,7 +171,7 @@ class Coach:
         CURRENT STRATEGY STATE:
         {current_strategy}
         
-        RECENT TRADE HISTORY (JSON):
+        RECENT CLOSED TRADE HISTORY (Last 20 Trades):
         {recent_history}
         
         TASK:
