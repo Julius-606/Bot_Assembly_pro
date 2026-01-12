@@ -277,7 +277,8 @@ def main():
                             clean_sl = round(sl, 5)
                             clean_tp = round(tp, 5)
                             
-                            tg_bot.send_msg(f"🚀 ENTRY: {pair} {signal}\nSL: {clean_sl}\nTP: {clean_tp}")
+                            # ✨ UPDATED: Added my_strategy.name to show the concoction!
+                            tg_bot.send_msg(f"🚀 ENTRY: {pair} {signal}\nSL: {clean_sl}\nTP: {clean_tp}\n🧪 {my_strategy.name}")
 
                             trade_data = {
                                 'ticket': result.order,

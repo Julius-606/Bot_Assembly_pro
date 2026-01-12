@@ -161,11 +161,11 @@ class Coach:
         {recent_history}
         
         TASK:
-        Analyze the recent trade performance. 
-        1. If PnL is positive and consistent, keep settings or minor tweaks.
-        2. If PnL is negative, drastic changes are needed. 
-        3. You can change 'ACTIVE_CONCOCTION' (ingredients from 'MENU') and 'PARAMS'.
-        4. You can also add pairs to 'BENCHED_PAIRS' if they are toxic.
+        Analyze recent performance to find the BEST POSSIBLE TRADING COMBINATION.
+        1. If PnL is positive, optimize 'PARAMS' for better efficiency.
+        2. If PnL is negative or stagnant, change the 'ACTIVE_CONCOCTION' using ingredients from the 'MENU'.
+        3. STRICTLY limit ingredients to the provided 'MENU' list.
+        4. Bench toxic pairs in 'BENCHED_PAIRS'.
         
         RESPONSE FORMAT:
         Return ONLY a raw JSON object representing the NEW STRATEGY_STATE. 

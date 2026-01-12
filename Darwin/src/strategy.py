@@ -3,6 +3,7 @@
 # ==============================================================================
 
 import pandas as pd
+import pandas_ta as ta  # <--- 🛠️ THE MISSING GUEST (Fixes 'no attribute ta')
 import numpy as np
 from datetime import datetime
 
@@ -54,7 +55,9 @@ class Strategy:
     Darwin v2.0 🧬
     """
     def __init__(self):
-        self.name = f"Darwin v{STRATEGY_STATE['VERSION']} 🧬"
+        # Dynamic Name based on Active Ingredients
+        ingredients = "+".join(STRATEGY_STATE['ACTIVE_CONCOCTION'])
+        self.name = f"Darwin v{STRATEGY_STATE['VERSION']} ({ingredients})"
         self.state = STRATEGY_STATE
 
     def check_bench(self, pair):
