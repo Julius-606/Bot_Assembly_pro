@@ -1,3 +1,6 @@
+# ==============================================================================
+# ---- Turtle Main v1.4.1 (Weekend Fix) ----
+# ==============================================================================
 import sys
 import os
 import time
@@ -19,7 +22,7 @@ try:
     from src.broker import BrokerAPI 
     from src.strategy import Strategy
     from src.telegram_bot import TelegramBot
-    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES
+    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS
     print("✅ The squad is assembled.")
 except ImportError as e:
     print(f"\n💀 CRITICAL IMPORT ERROR: {e}")
@@ -28,6 +31,86 @@ except ImportError as e:
 # -------------------------------------------------------------------------
 # 🧠 HELPER LOGIC
 # -------------------------------------------------------------------------
+def sync_balance(broker, cloud):
+    """
+    🏦 The Banker.
+    Forces the bot to look at the REAL account balance, not the memory.
+    """
+    if not broker.connected: return
+    account_info = mt5.account_info()
+    if account_info:
+        real_balance = account_info.balance
+        cloud.state['current_balance'] = real_balance
+
+def manage_running_trades(broker, cloud, tg_bot):
+    """
+    🏃‍♂️ The Trailer.
+    Moves SL to break-even and trails profit.
+    """
+    if not broker.connected: return
+    
+    # Get live positions
+    positions = broker.get_open_positions()
+    if not positions: return
+
+    for pos in positions:
+        symbol = pos.symbol
+        ticket = pos.ticket
+        price_current = pos.price_current
+        price_open = pos.price_open
+        sl = pos.sl
+        tp = pos.tp
+        type_op = pos.type 
+        
+        # Determine Point Size (e.g. 0.00001 or 0.01)
+        symbol_info = mt5.symbol_info(symbol)
+        if not symbol_info: continue
+        point = symbol_info.point
+        
+        # CONFIGS (Converted from 'points' to real price delta)
+        activation_dist = TRAILING_CONFIG['sl_activation_distance'] * point
+        trail_dist = TRAILING_CONFIG['sl_distance'] * point
+        
+        # --- BUY LOGIC ---
+        if type_op == 0: 
+            profit_distance = price_current - price_open
+            
+            # 1. Break Even / Trailing
+            if profit_distance > activation_dist:
+                new_sl = price_current - trail_dist
+                # Only move SL UP
+                if new_sl > sl:
+                    request = {
+                        "action": mt5.TRADE_ACTION_SLTP,
+                        "position": ticket,
+                        "sl": float(new_sl),
+                        "tp": float(tp), # Keep existing TP
+                        "magic": 234000
+                    }
+                    res = mt5.order_send(request)
+                    if res.retcode == mt5.TRADE_RETCODE_DONE:
+                        print(f"   🏃‍♂️ Trailed SL for {symbol} to {new_sl}")
+
+        # --- SELL LOGIC ---
+        elif type_op == 1:
+            profit_distance = price_open - price_current
+            
+            # 1. Break Even / Trailing
+            if profit_distance > activation_dist:
+                new_sl = price_current + trail_dist
+                # Only move SL DOWN (remember SL is above price for shorts)
+                if new_sl < sl or sl == 0:
+                    request = {
+                        "action": mt5.TRADE_ACTION_SLTP,
+                        "position": ticket,
+                        "sl": float(new_sl),
+                        "tp": float(tp),
+                        "magic": 234000
+                    }
+                    res = mt5.order_send(request)
+                    if res.retcode == mt5.TRADE_RETCODE_DONE:
+                        print(f"   🏃‍♂️ Trailed SL for {symbol} to {new_sl}")
+
 def audit_trades(broker, cloud, tg_bot):
     if not broker.connected: return
 
@@ -59,30 +142,41 @@ def check_weekend_chill(broker, cloud, tg_bot):
     Keeps Crypto running.
     """
     now = datetime.now()
+    # Friday = 4. Check if it's Friday and past 20:00 (8 PM)
     if now.weekday() == 4 and now.hour >= 20:
         open_trades = cloud.state.get('open_bot_trades', [])
         for trade in open_trades[:]:
             pair = trade['pair']
             if pair not in CRYPTO_MARKETS:
                 print(f"   🏖️ Weekend Chill: Closing {pair}...")
+                # Close trade
                 is_long = trade['signal'] == 'BUY'
                 if broker.close_trade(trade['ticket'], pair, trade['volume'], is_long):
                     tg_bot.send_msg(f"🏖️ WEEKEND EXIT: {pair}")
                     cloud.deregister_trade(trade['ticket'])
                     cloud.log_trade(trade, reason="FRIDAY_CLOSE")
         return True
+    
+    # 🛑 HARD STOP for Sunday Trading (6 = Sunday)
+    # If it's Sunday, we return True to BLOCK new trades, but we don't close existing ones (already done Friday)
+    if now.weekday() == 6:
+        return True
+        
     return False
 
 def main():
-    # 🛠️ FIXED IDENTITY
-    print("\n🚀 INITIALIZING TURTLE V1.1...")
+    print("\n🚀 INITIALIZING TURTLE V1.4.1...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
+    print("   🏃‍♂️ Trailing Logic: ACTIVE")
     print("   🏖️ Weekend Protocol: ACTIVE")
     
     # 1. Initialize Components
     my_cloud = CloudManager()
     my_broker = BrokerAPI()
-    my_strategy = Strategy()
+    
+    # 🧠 Inject Config Params into Strategy
+    my_strategy = Strategy(default_params=DEFAULT_PARAMS)
+    
     tg_bot = TelegramBot()
 
     # 2. Connect to MT5
@@ -95,6 +189,9 @@ def main():
     # 3. Main Loop
     try:
         while True:
+            # Sync Real Balance
+            sync_balance(my_broker, my_cloud)
+
             # Check for Telegram Commands
             cmd = tg_bot.get_latest_command()
             
@@ -107,14 +204,18 @@ def main():
                 tg_bot.send_msg("▶️ Bot RESUMED. Hunting...")
                 my_cloud.save_memory()
             elif cmd == "status":
-                status_msg = f"📊 STATUS REPORT\nState: {my_cloud.state.get('status')}\nOpen Trades: {len(my_cloud.state.get('open_bot_trades', []))}"
+                bal = my_cloud.state.get('current_balance', 0)
+                status_msg = f"📊 STATUS REPORT\nState: {my_cloud.state.get('status')}\nBalance: ${bal}\nOpen Trades: {len(my_cloud.state.get('open_bot_trades', []))}"
                 tg_bot.send_msg(status_msg)
 
-            # Audit existing trades
+            # Audit existing trades (Logs closes)
             audit_trades(my_broker, my_cloud, tg_bot)
             
-            # Check Weekend Protocol
-            is_weekend_chill = check_weekend_chill(my_broker, my_cloud, tg_bot)
+            # Manage Running Trades (Trailing SL) 🏃‍♂️
+            manage_running_trades(my_broker, my_cloud, tg_bot)
+            
+            # Check Weekend/Market Status
+            is_weekend = check_weekend_chill(my_broker, my_cloud, tg_bot)
 
             # If paused, skip analysis
             if my_cloud.state.get('status') == 'paused':
@@ -134,14 +235,18 @@ def main():
             for pair in active_pairs:
                 
                 # 🛑 DUPLICATE CHECK
-                if pair in active_trade_pairs:
-                    continue
+                if pair in active_trade_pairs: continue
 
-                # 🏖️ WEEKEND FILTER
-                if is_weekend_chill and pair not in CRYPTO_MARKETS:
+                # 🛑 FILTER: If weekend, SKIP FOREX completely
+                if is_weekend and pair not in CRYPTO_MARKETS:
                     continue
 
                 try:
+                    # 🛠️ CHECK MARKET OPEN STATUS BEFORE REQUESTING DATA
+                    # This prevents the "Market Closed" error spam
+                    sym_info = mt5.symbol_info(pair)
+                    if not sym_info: continue
+                    
                     # Get Data
                     df = my_broker.get_data(pair, timeframe=mt5.TIMEFRAME_M15, n=200)
                     if df is None or df.empty: continue
@@ -190,7 +295,9 @@ def main():
                                 break 
 
                 except Exception as e:
-                    print(f"   ❌ Error {pair}: {e}")
+                    # 🤫 Silence the "Market Closed" errors to keep logs clean
+                    if "Market closed" not in str(e):
+                        print(f"   ❌ Error {pair}: {e}")
 
             time.sleep(10)
 

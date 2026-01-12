@@ -1,24 +1,13 @@
-# ==============================================================================
-# ---- Trend Runner Config v2.4.0 ----
-# ==============================================================================
-import os
-import sys
+import json
+import gspread
+from google.oauth2.service_account import Credentials
 
-# ==============================================================================
-# 🔐 SECRET SAUCE (CREDENTIALS)
-# ==============================================================================
+# 🕵️‍♂️ SNITCH 2.0: HARDCODED CREDENTIALS TEST
+# If this fails, your Google Service Account is dead or permissions are wrong.
 
-TELEGRAM_BOT_TOKEN = "8141234434:AAFaO3z4NCASSFYwYkH4t1Q4lkA0Us7x_qA" 
-TELEGRAM_CHAT_ID = "6882899041"
-
-# --- MT5 SPECIFIC LOGINS ---
-MT5_LOGIN = 105473947
-MT5_PASSWORD = ":+xLBl3B"
-MT5_SERVER = "FBS-Demo"
-MT5_PATH = r"C:\Program Files\MetaTrader 5 - Trend Runner\terminal64.exe" 
-
-# --- GOOGLE CLOUD CONFIG ---
-GOOGLE_CREDS = r"""
+# --- PASTE YOUR CREDENTIALS HERE ---
+# (I've pre-filled this with the ones you shared earlier)
+GOOGLE_CREDS_RAW = r"""
 {
   "type": "service_account",
   "project_id": "mt5-algo-bot-logger",
@@ -35,43 +24,47 @@ GOOGLE_CREDS = r"""
 """
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
-WORKSHEET_LOGS = "Sheet1"
-DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
-MEMORY_FILENAME = "trend_runner_memory.json"
+WORKSHEET_LOGS = "Trade_Logs"
 
-DEFAULT_STRATEGY = "TREND_RUNNER"
-BOT_IDENTITY = "trendrunner"
+def run_snitch():
+    print("\n🕵️‍♂️ SNITCH 2.0 STARTED")
+    print("--------------------------------")
 
-# --- RISK MANAGEMENT 🛡️ ---
-FIXED_LOT_SIZE = 0.01 
-MAX_OPEN_TRADES = 5 
+    try:
+        # 1. Parse JSON
+        print("1️⃣  Parsing Credentials...")
+        creds_dict = json.loads(GOOGLE_CREDS_RAW)
+        email = creds_dict.get('client_email')
+        print(f"   ✅ Success. Email: {email}")
 
-# --- MARKET CLASSIFICATION ---
-USER_DEFAULT_MARKETS = [
-    "EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD",
-    "ETHUSD", "LTCUSD", "AUDUSD", "NZDUSD", "USDCAD", 
-    "USDCHF", "XAGUSD",
-    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD"
-]
+        # 2. Auth
+        print("\n2️⃣  Authenticating with Google...")
+        creds = Credentials.from_service_account_info(
+            creds_dict,
+            scopes=['https://www.googleapis.com/auth/spreadsheets']
+        )
+        client = gspread.authorize(creds)
+        print("   ✅ Authenticated.")
 
-CRYPTO_MARKETS = [
-    "BTCUSD", "ETHUSD", "LTCUSD", 
-    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD"
-]
+        # 3. Open Sheet
+        print(f"\n3️⃣  Opening Sheet: {SHEET_URL}")
+        sheet = client.open_by_url(SHEET_URL)
+        print(f"   ✅ Sheet Open: '{sheet.title}'")
 
-# --- STRATEGY PARAMETERS ---
-# Controls the sensitivity of the Trend Runner
-DEFAULT_PARAMS = {
-    "ema_period": 200,
-    "rsi_period": 14,
-    "atr_period": 14,
-    "risk_per_trade": 0.01
-}
+        # 4. Write
+        print(f"\n4️⃣  Writing to '{WORKSHEET_LOGS}'...")
+        try:
+            ws = sheet.worksheet(WORKSHEET_LOGS)
+        except:
+            print("   ⚠️ Worksheet missing. Creating it...")
+            ws = sheet.add_worksheet(title=WORKSHEET_LOGS, rows=100, cols=10)
+        
+        ws.append_row(["SNITCH_2.0", "DIRECT_TEST", "SUCCESS", "🚀"])
+        print("   ✅ ROW ADDED! Go check your sheet.")
 
-# --- RUNNER LOGIC (TRAILING) ---
-TRAILING_CONFIG = {
-    "tp_proximity_threshold": 50, 
-    "tp_extension": 200,
-    "sl_activation_distance": 100, 
-    "sl_distance": 50
-}
+    except Exception as e:
+        print("\n❌ SNITCH FAILED!")
+        print(f"   Error: {e}")
+
+if __name__ == "__main__":
+    run_snitch()

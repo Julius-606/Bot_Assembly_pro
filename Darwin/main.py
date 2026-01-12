@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- Trend Runner Main v2.4.1 (Weekend Fix) ----
+# ---- Trend Runner Main v2.4.0 ----
 # ==============================================================================
 import sys
 import os
@@ -22,6 +22,8 @@ try:
     from src.broker import BrokerAPI 
     from src.strategy import Strategy
     from src.telegram_bot import TelegramBot
+    from src.coach import Coach # 🧢 The Boss
+    # Added DEFAULT_PARAMS to import
     from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS
     print("✅ The squad is assembled.")
 except ImportError as e:
@@ -60,7 +62,7 @@ def manage_running_trades(broker, cloud, tg_bot):
         price_open = pos.price_open
         sl = pos.sl
         tp = pos.tp
-        type_op = pos.type 
+        type_op = pos.type # 0=Buy, 1=Sell
         
         # Determine Point Size (e.g. 0.00001 or 0.01)
         symbol_info = mt5.symbol_info(symbol)
@@ -68,6 +70,8 @@ def manage_running_trades(broker, cloud, tg_bot):
         point = symbol_info.point
         
         # CONFIGS (Converted from 'points' to real price delta)
+        # Threshold: Distance to TP before extending (Not used here, simplified to trailing)
+        # We use SL Activation: Distance in profit to trigger trailing
         activation_dist = TRAILING_CONFIG['sl_activation_distance'] * point
         trail_dist = TRAILING_CONFIG['sl_distance'] * point
         
@@ -112,13 +116,18 @@ def manage_running_trades(broker, cloud, tg_bot):
                         print(f"   🏃‍♂️ Trailed SL for {symbol} to {new_sl}")
 
 def audit_trades(broker, cloud, tg_bot):
-    if not broker.connected: return
+    """
+    Returns True if a trade was closed, False otherwise.
+    """
+    if not broker.connected: return False
 
     memory_trades = cloud.state.get('open_bot_trades', [])
-    if not memory_trades: return
+    if not memory_trades: return False
 
     live_positions = broker.get_open_positions() 
     live_tickets = [p.ticket for p in live_positions]
+    
+    trade_closed_flag = False
 
     for trade in memory_trades[:]:
         ticket = trade['ticket']
@@ -134,6 +143,9 @@ def audit_trades(broker, cloud, tg_bot):
                 cloud.log_trade(trade, reason="CLOSED_BY_BROKER") 
                 cloud.deregister_trade(ticket)
                 tg_bot.send_msg(f"💰 TRADE CLOSED: {trade['pair']}\nPnL: {trade['pnl']}")
+                trade_closed_flag = True
+    
+    return trade_closed_flag
 
 def check_weekend_chill(broker, cloud, tg_bot):
     """
@@ -155,17 +167,11 @@ def check_weekend_chill(broker, cloud, tg_bot):
                     tg_bot.send_msg(f"🏖️ WEEKEND EXIT: {pair}")
                     cloud.deregister_trade(trade['ticket'])
                     cloud.log_trade(trade, reason="FRIDAY_CLOSE")
-        return True
-    
-    # 🛑 HARD STOP for Sunday Trading (6 = Sunday)
-    # If it's Sunday, we return True to BLOCK new trades, but we don't close existing ones (already done Friday)
-    if now.weekday() == 6:
-        return True
-        
+        return True # It IS Friday chill time
     return False
 
 def main():
-    print("\n🚀 INITIALIZING TREND RUNNER V2.4.1...")
+    print("\n🚀 INITIALIZING TREND RUNNER V2.4.0...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
     print("   🏃‍♂️ Trailing Logic: ACTIVE")
     print("   🏖️ Weekend Protocol: ACTIVE")
@@ -174,8 +180,12 @@ def main():
     my_cloud = CloudManager()
     my_broker = BrokerAPI()
     
+    # 🧢 Initialize the Coach
+    my_coach = Coach()
+    
     # 🧠 Inject Config Params into Strategy
-    my_strategy = Strategy(default_params=DEFAULT_PARAMS)
+    # FIXED: No arguments passed here! Strategy is independent.
+    my_strategy = Strategy()
     
     tg_bot = TelegramBot()
 
@@ -209,13 +219,16 @@ def main():
                 tg_bot.send_msg(status_msg)
 
             # Audit existing trades (Logs closes)
-            audit_trades(my_broker, my_cloud, tg_bot)
+            # If a trade closed, we wake up the Coach immediately 🧢
+            if audit_trades(my_broker, my_cloud, tg_bot):
+                print("   🧢 Trade Closed. Waking up the Coach...")
+                my_coach.consult_oracle()
             
             # Manage Running Trades (Trailing SL) 🏃‍♂️
             manage_running_trades(my_broker, my_cloud, tg_bot)
             
-            # Check Weekend/Market Status
-            is_weekend = check_weekend_chill(my_broker, my_cloud, tg_bot)
+            # Check Weekend Protocol
+            is_weekend_chill = check_weekend_chill(my_broker, my_cloud, tg_bot)
 
             # If paused, skip analysis
             if my_cloud.state.get('status') == 'paused':
@@ -237,22 +250,18 @@ def main():
                 # 🛑 DUPLICATE CHECK
                 if pair in active_trade_pairs: continue
 
-                # 🛑 FILTER: If weekend, SKIP FOREX completely
-                if is_weekend and pair not in CRYPTO_MARKETS:
+                # 🏖️ WEEKEND FILTER: Skip Forex on Friday night
+                if is_weekend_chill and pair not in CRYPTO_MARKETS:
                     continue
 
                 try:
-                    # 🛠️ CHECK MARKET OPEN STATUS BEFORE REQUESTING DATA
-                    # This prevents the "Market Closed" error spam
-                    sym_info = mt5.symbol_info(pair)
-                    if not sym_info: continue
-                    
                     # Get Data
                     df = my_broker.get_data(pair, timeframe=mt5.TIMEFRAME_M15, n=200)
                     if df is None or df.empty: continue
 
                     # Analyze
-                    df = my_strategy.calc_indicators(df, my_cloud.state.get('strategy_params', {}))
+                    # FIXED: Only passing 'df'. No params!
+                    df = my_strategy.calc_indicators(df)
                     signal, sl, tp, comment = my_strategy.analyze(pair, my_broker, my_cloud)
 
                     if signal:
@@ -295,9 +304,7 @@ def main():
                                 break 
 
                 except Exception as e:
-                    # 🤫 Silence the "Market Closed" errors to keep logs clean
-                    if "Market closed" not in str(e):
-                        print(f"   ❌ Error {pair}: {e}")
+                    print(f"   ❌ Error {pair}: {e}")
 
             time.sleep(10)
 

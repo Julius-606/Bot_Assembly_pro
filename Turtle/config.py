@@ -1,8 +1,9 @@
+# ==============================================================================
+# ---- Turtle Config v1.3.0 ----
+# ==============================================================================
 import os
 import sys
 
-# ==============================================================================
-# ---- Turtle Strat ----
 # ==============================================================================
 # 🔐 SECRET SAUCE (CREDENTIALS)
 # ==============================================================================
@@ -34,9 +35,9 @@ GOOGLE_CREDS = r"""
 """
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
-WORKSHEET_LOGS = "Trade_Logs"
+WORKSHEET_LOGS = "Sheet2"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
-MEMORY_FILENAME = "turtle_memory.json"
+MEMORY_FILENAME = "turtle_memor.json"
 
 DEFAULT_STRATEGY = "TURTLE"
 BOT_IDENTITY = "turtle"
@@ -50,13 +51,12 @@ USER_DEFAULT_MARKETS = [
     "EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD",
     "ETHUSD", "LTCUSD", "AUDUSD", "NZDUSD", "USDCAD", 
     "USDCHF", "XAGUSD",
-    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD" # 🚀 New Squad
+    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD"
 ]
 
-# 24/7 Markets (Do not close on Friday)
 CRYPTO_MARKETS = [
     "BTCUSD", "ETHUSD", "LTCUSD", 
-    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD" # 🚀 Weekend Pass
+    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD"
 ]
 
 # --- TURTLE PARAMETERS ---
