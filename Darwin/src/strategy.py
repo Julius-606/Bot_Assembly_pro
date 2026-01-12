@@ -3,7 +3,7 @@
 # ==============================================================================
 
 import pandas as pd
-import pandas_ta as ta  # <--- 🛠️ THE MISSING GUEST (Fixes 'no attribute ta')
+import ta # <--- 🛠️ USING STANDARD 'ta' LIBRARY (No git required)
 import numpy as np
 from datetime import datetime
 
@@ -68,44 +68,72 @@ class Strategy:
         return False
 
     def calc_indicators(self, df):
-        """Calculates ONLY the ingredients needed for the current recipe."""
+        """Calculates ONLY the ingredients needed for the current recipe using 'ta' lib."""
         if df.empty: return df
         p = self.state["PARAMS"]
         recipe = self.state["ACTIVE_CONCOCTION"]
+        
+        # Ensure numeric types
+        df['close'] = df['close'].astype(float)
+        df['high'] = df['high'].astype(float)
+        df['low'] = df['low'].astype(float)
 
-        # 1. ESSENTIALS (Risk)
-        df.ta.atr(length=p['ATR_PERIOD'], append=True)
+        # 1. ESSENTIALS (Risk) - ATR
+        # Manually assign to match old naming convention
+        atr_obj = ta.volatility.AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=p['ATR_PERIOD'])
+        df[f"ATRr_{p['ATR_PERIOD']}"] = atr_obj.average_true_range()
 
         # 2. TREND
         if "EMA_CROSS" in recipe:
-            df.ta.ema(length=p['EMA_FAST'], append=True)
-            df.ta.ema(length=p['EMA_SLOW'], append=True)
+            df[f"EMA_{p['EMA_FAST']}"] = ta.trend.EMAIndicator(close=df['close'], window=p['EMA_FAST']).ema_indicator()
+            df[f"EMA_{p['EMA_SLOW']}"] = ta.trend.EMAIndicator(close=df['close'], window=p['EMA_SLOW']).ema_indicator()
+            
         if "SAR_REVERSAL" in recipe:
-            df.ta.psar(append=True)
+            # 'ta' gives PSAR values directly
+            df['PSAR'] = ta.trend.PSARIndicator(high=df['high'], low=df['low'], close=df['close']).psar()
+            
         if "ICHIMOKU_CLOUD" in recipe:
-            # Ichimoku returns a DataFrame, we need to append carefully
-            ichimoku, _ = df.ta.ichimoku()
-            df = pd.concat([df, ichimoku], axis=1)
+            ichi = ta.trend.IchimokuIndicator(high=df['high'], low=df['low'])
+            df['ISA_9'] = ichi.ichimoku_a()
+            df['ISB_26'] = ichi.ichimoku_b()
+            
         if "DONCHIAN_BREAKOUT" in recipe:
-            df.ta.donchian(lower_length=p['DONCHIAN_PERIOD'], upper_length=p['DONCHIAN_PERIOD'], append=True)
+            dc = ta.volatility.DonchianChannel(high=df['high'], low=df['low'], close=df['close'], window=p['DONCHIAN_PERIOD'])
+            df[f"DCU_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"] = dc.donchian_channel_hband()
+            df[f"DCL_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"] = dc.donchian_channel_lband()
+            
         if "ADX_FILTER" in recipe:
-            df.ta.adx(length=14, append=True)
+            df['ADX_14'] = ta.trend.ADXIndicator(high=df['high'], low=df['low'], close=df['close'], window=14).adx()
 
         # 3. MOMENTUM
         if "RSI_FILTER" in recipe:
-            df.ta.rsi(length=p['RSI_PERIOD'], append=True)
+            df[f"RSI_{p['RSI_PERIOD']}"] = ta.momentum.RSIIndicator(close=df['close'], window=p['RSI_PERIOD']).rsi()
+            
         if "MACD_CONFIRM" in recipe:
-            df.ta.macd(append=True)
+            macd = ta.trend.MACD(close=df['close'])
+            df['MACD_12_26_9'] = macd.macd() # Standard MACD line
+            
         if "STOCH_ENTRY" in recipe:
-            df.ta.stoch(append=True)
+            stoch = ta.momentum.StochasticOscillator(high=df['high'], low=df['low'], close=df['close'])
+            df['STOCHk_14_3_3'] = stoch.stoch()
+            df['STOCHd_14_3_3'] = stoch.stoch_signal()
+            
         if "CCI_MOMENTUM" in recipe:
-            df.ta.cci(append=True)
+            df['CCI_14_0.015'] = ta.trend.CCIIndicator(high=df['high'], low=df['low'], close=df['close']).cci()
 
         # 4. VOLATILITY
         if "BOLLINGER_SQUEEZE" in recipe:
-            df.ta.bbands(append=True)
+            bb = ta.volatility.BollingerBands(close=df['close'])
+            df['BBU_5_2.0'] = bb.bollinger_hband()
+            df['BBL_5_2.0'] = bb.bollinger_lband()
+            
         if "KELTNER_CHANNEL" in recipe:
-            df.ta.kc(scalar=p['KELTNER_MULT'], append=True)
+            # Manual Keltner Calculation (EMA +/- ATR * Mult)
+            kc_ema = ta.trend.EMAIndicator(close=df['close'], window=20).ema_indicator()
+            kc_atr = ta.volatility.AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=10).average_true_range()
+            mult = p['KELTNER_MULT']
+            df[f"KCUe_20_{mult}"] = kc_ema + (kc_atr * mult)
+            df[f"KCLe_20_{mult}"] = kc_ema - (kc_atr * mult)
 
         return df
 
@@ -132,24 +160,18 @@ class Strategy:
             if not (fast < slow): sell_vote = False
 
         if "SAR_REVERSAL" in recipe:
-            # PSAR columns are tricky, usually PSARl (long) and PSARs (short)
-            # Simplification: Close > PSAR = Bull
-            psar_cols = [c for c in df.columns if 'PSAR' in c]
-            if psar_cols:
-                psar_val = curr[psar_cols[0]] # Usually combined or just check logic
-                if curr['close'] < psar_val: buy_vote = False
-                if curr['close'] > psar_val: sell_vote = False
+            # Logic: Close > PSAR = Bull
+            psar_val = curr['PSAR']
+            if curr['close'] < psar_val: buy_vote = False
+            if curr['close'] > psar_val: sell_vote = False
 
         if "ICHIMOKU_CLOUD" in recipe:
-            # Span A (ISA) and Span B (ISB)
-            # Default names: ISA_9, ISB_26
             span_a = curr['ISA_9']
             span_b = curr['ISB_26']
             if not (curr['close'] > max(span_a, span_b)): buy_vote = False # Above Cloud
             if not (curr['close'] < min(span_a, span_b)): sell_vote = False # Below Cloud
 
         if "DONCHIAN_BREAKOUT" in recipe:
-            # Buy if broke previous High
             upper = prev[f"DCU_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"]
             lower = prev[f"DCL_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"]
             if not (curr['close'] > upper): buy_vote = False
@@ -168,9 +190,7 @@ class Strategy:
 
         if "STOCH_ENTRY" in recipe:
             k, d = curr['STOCHk_14_3_3'], curr['STOCHd_14_3_3']
-            # Cross Up from oversold
             if not (k < 20 and k > d): buy_vote = False 
-            # Cross Down from overbought
             if not (k > 80 and k < d): sell_vote = False
 
         # --- VOLATILITY LOGIC ---
@@ -186,7 +206,6 @@ class Strategy:
 
         # --- EXOTIC LOGIC ---
         if "FIB_GOLDEN_ZONE" in recipe:
-            # Custom calc: Lookback High/Low
             lb = p['FIB_LOOKBACK']
             high = df['high'].rolling(lb).max().iloc[-1]
             low = df['low'].rolling(lb).min().iloc[-1]
@@ -194,10 +213,8 @@ class Strategy:
             level_618 = high - (diff * 0.618)
             level_500 = high - (diff * 0.500)
             
-            # Buy if in zone
             in_zone = level_618 <= curr['close'] <= level_500
             if not in_zone: buy_vote = False; sell_vote = False 
-            # Note: This is a pullback strategy, might conflict with trend breakouts
 
         # --- EXECUTION ---
         atr = curr[f"ATRr_{p['ATR_PERIOD']}"]

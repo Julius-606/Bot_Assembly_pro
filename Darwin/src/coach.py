@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import warnings
 import pandas as pd
 import google.generativeai as genai
 from datetime import datetime, timedelta
@@ -8,6 +9,9 @@ from src.cloud import CloudManager
 from src.telegram_bot import TelegramBot
 from src.strategy import STRATEGY_STATE # Read current state
 from config import GEMINI_API_KEY
+
+# 🔇 SILENCE THE GOOGLE WARNING
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class Coach:
     """
