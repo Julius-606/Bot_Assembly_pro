@@ -84,6 +84,11 @@ class CloudManager:
 
     def log_trade(self, trade_data, reason="CLOSED"):
         """Logs a trade event to Google Sheets."""
+        # 🚫 LOG CLEANUP: Don't log "OPEN" events to sheet, only closed trades.
+        if reason == "OPEN":
+            # print(f"   📝 Trade opened (Memory Only): {trade_data.get('pair')}")
+            return
+
         try:
             sheet = self.sheets_client.open_by_url(self.sheet_url)
             ws = sheet.worksheet(WORKSHEET_LOGS)

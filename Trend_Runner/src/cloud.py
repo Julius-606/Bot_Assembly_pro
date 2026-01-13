@@ -90,18 +90,19 @@ class CloudManager:
             sheet = self.sheets_client.open_by_url(SHEET_URL)
             try: ws = sheet.worksheet(WORKSHEET_LOGS)
             except: 
+                # Removed "Log Time" from header
                 ws = sheet.add_worksheet(title=WORKSHEET_LOGS, rows=1000, cols=20)
-                ws.append_row(["Ticket", "Strategy", "Signal", "Pair", "Log Time", "Time", "Entry", "SL", "TP", "Vol", "Spread", "Exit", "Close Time", "PnL", "Balance", "Reason"])
+                ws.append_row(["Ticket", "Strategy", "Signal", "Pair", "Open Time", "Entry", "SL", "TP", "Vol", "Spread", "Exit", "Close Time", "PnL", "Balance", "Reason"])
             
             status_id = str(trade.get('ticket', 'UNKNOWN'))
-            log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # log_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Removed
 
             row = [
                 status_id, 
                 str(trade.get('strategy', 'Unknown')), 
                 str(trade.get('signal', 'Unknown')), 
                 str(trade.get('pair', 'Unknown')),
-                log_time,
+                # log_time, # Removed
                 str(trade.get('open_time', '')), 
                 float(trade.get('entry_price', 0)), 
                 float(trade.get('stop_loss_price', 0)), 

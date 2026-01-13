@@ -284,9 +284,10 @@ def main():
                                 'exit_price': 0,
                                 'pnl': 0
                             }
-                            # Log Entry
-                            my_cloud.log_trade(trade_data, reason="OPEN")
-                            # Save to Memory for the Auditor
+                            # 🚫 REMOVED "OPEN" LOGGING PER USER REQUEST
+                            # my_cloud.log_trade(trade_data, reason="OPEN")
+                            
+                            # Save to Memory for the Auditor (Still needed to track the trade!)
                             my_cloud.register_trade(trade_data)
                             
                             active_trade_pairs.append(pair)

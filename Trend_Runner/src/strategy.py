@@ -1,18 +1,20 @@
 # ==============================================================================
-# ---- Trend Runner Strategy v2.4.0 ----
+# ---- Trend Runner Strategy v2.5.0 ----
 # ==============================================================================
-# "Real Talk" Edition: High Probability, Trend Following, ATR Risk Mgmt.
+# "Ironclad" Edition: Hard Risk Clamping implemented.
 
 import pandas as pd
 import numpy as np
+import MetaTrader5 as mt5 # Imported for symbol info access
+from config import FIXED_LOT_SIZE, MAX_RISK_PER_TRADE_PCT
 
 class Strategy:
     """
     The Mastermind. 🧠
-    Encapsulates logic for Trend Following.
+    Encapsulates logic for Trend Following with strict % equity risk rules.
     """
     def __init__(self, default_params=None):
-        self.name = "Trend Runner v1.4 (Risk Clamped)"
+        self.name = "Trend Runner v2.5 (3% Limit)"
         # Use injected params or fallback to safe defaults
         self.default_params = default_params if default_params else {
             "ema_period": 200,
@@ -71,11 +73,40 @@ class Strategy:
         recent_high = df['high'].iloc[-6:-1].max()
         recent_low = df['low'].iloc[-6:-1].min()
         
-        # 🛡️ RISK CLAMP: SL cannot exceed 1% of price
-        max_sl_dist = price * 0.01 
-        raw_sl_dist = atr * 2.0
-        final_sl_dist = min(raw_sl_dist, max_sl_dist)
+        # ---------------------------------------------------------
+        # 🛡️ STRICT RISK CLAMP (3% RULE)
+        # ---------------------------------------------------------
+        # Get Account Balance
+        balance = cloud.state.get('current_balance', 0)
+        if balance <= 0: balance = 100 # Fallback safety for division
         
+        # Calculate Max Dollar Loss allowed
+        max_loss_usd = balance * MAX_RISK_PER_TRADE_PCT
+        
+        # Get Contract Size (e.g. 100 for XAU, 100000 for EUR)
+        sym_info = mt5.symbol_info(pair)
+        contract_size = sym_info.trade_contract_size if sym_info else 100000
+        
+        # Calculate Logic SL Distance (ATR Based)
+        # Standard: 2 * ATR
+        raw_sl_dist = atr * 2.0
+        
+        # Calculate the Dollar cost of that SL distance
+        # Loss = Volume * Contract_Size * Price_Diff
+        potential_loss_usd = FIXED_LOT_SIZE * contract_size * raw_sl_dist
+        
+        final_sl_dist = raw_sl_dist
+        
+        # IF potential loss > 3% allowed, Force Clamp
+        if potential_loss_usd > max_loss_usd:
+            # Force the distance to match exactly 3%
+            # Price_Diff = Max_Loss / (Volume * Contract_Size)
+            forced_dist = max_loss_usd / (FIXED_LOT_SIZE * contract_size)
+            final_sl_dist = forced_dist
+            # print(f"   🛡️ RISK ALERT {pair}: SL clamped from {raw_sl_dist:.4f} to {forced_dist:.4f} (${max_loss_usd:.2f} max)")
+            
+        # ---------------------------------------------------------
+
         # --- LONG SETUP (BUY) ---
         if (curr['close'] > curr['ema_200']) and \
            (curr['close'] > recent_high) and \

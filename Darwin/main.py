@@ -23,8 +23,8 @@ try:
     from src.strategy import Strategy
     from src.telegram_bot import TelegramBot
     from src.coach import Coach # 🧢 The Boss
-    # Added DEFAULT_PARAMS to import
-    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS
+    # Added MAX_RISK_PCT to import
+    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS, MAX_RISK_PCT
     print("✅ The squad is assembled.")
 except ImportError as e:
     print(f"\n💀 CRITICAL IMPORT ERROR: {e}")
@@ -173,6 +173,7 @@ def check_weekend_chill(broker, cloud, tg_bot):
 def main():
     print("\n🚀 INITIALIZING TREND RUNNER V2.4.0...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
+    print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
     print("   🏃‍♂️ Trailing Logic: ACTIVE")
     print("   🏖️ Weekend Protocol: ACTIVE")
     
@@ -207,7 +208,7 @@ def main():
             
             if cmd == "pause":
                 my_cloud.state['status'] = 'paused'
-                tg_bot.send_msg("⏸️ Bot PAUSED. No new entries.")
+                tg_bot.send_msg("⏸️ Bot PAUSED. No new entries. (Managing existing trades)")
                 my_cloud.save_memory()
             elif cmd == "resume":
                 my_cloud.state['status'] = 'running'
@@ -215,7 +216,14 @@ def main():
                 my_cloud.save_memory()
             elif cmd == "status":
                 bal = my_cloud.state.get('current_balance', 0)
-                status_msg = f"📊 STATUS REPORT\nState: {my_cloud.state.get('status')}\nBalance: ${bal}\nOpen Trades: {len(my_cloud.state.get('open_bot_trades', []))}"
+                active_count = len(my_cloud.state.get('open_bot_trades', []))
+                status_msg = (
+                    f"📊 STATUS REPORT\n"
+                    f"State: {my_cloud.state.get('status')}\n"
+                    f"Balance: ${bal}\n"
+                    f"Open Trades: {active_count}\n"
+                    f"Strategy: {my_strategy.name}"
+                )
                 tg_bot.send_msg(status_msg)
 
             # Audit existing trades (Logs closes)
@@ -260,13 +268,41 @@ def main():
                     if df is None or df.empty: continue
 
                     # Analyze
-                    # FIXED: Only passing 'df'. No params!
                     df = my_strategy.calc_indicators(df)
                     signal, sl, tp, comment = my_strategy.analyze(pair, my_broker, my_cloud)
 
                     if signal:
-                        # Execute
+                        # 1. Calc Basic Volume
                         volume = my_broker.calc_position_size(pair, sl, risk=0.01)
+                        
+                        # 2. 👮 RISK POLICE: Force SL to adhere to Max Risk %
+                        current_balance = my_cloud.state.get('current_balance', 100) # Default 100 to be safe
+                        risk_limit_usd = current_balance * MAX_RISK_PCT
+                        
+                        is_long = (signal == 'BUY')
+                        
+                        # Validate and possibly Adjust SL
+                        new_sl, was_adjusted = my_broker.validate_sl_for_risk(
+                            pair, is_long, df['close'].iloc[-1], sl, volume, risk_limit_usd
+                        )
+                        
+                        if was_adjusted:
+                            print(f"   👮 Risk Police: Tightened SL for {pair} to limit loss to ${risk_limit_usd:.2f}")
+                            
+                            # Safety check: Is SL inside the spread?
+                            tick = mt5.symbol_info_tick(pair)
+                            current_price = tick.ask if is_long else tick.bid
+                            dist = abs(current_price - new_sl)
+                            spread_val = tick.ask - tick.bid
+                            
+                            # If New SL is dangerously close (less than 2x spread), abort trade
+                            if dist < (spread_val * 2):
+                                print(f"   🚫 Trade Aborted: Forced SL is too close to spread.")
+                                continue
+                                
+                            sl = new_sl # Apply the new SL
+
+                        # Execute
                         result = my_broker.execute_trade(pair, signal, volume, sl, tp, comment)
                         
                         if result:
@@ -277,8 +313,10 @@ def main():
                             clean_sl = round(sl, 5)
                             clean_tp = round(tp, 5)
                             
-                            # ✨ UPDATED: Added my_strategy.name to show the concoction!
                             tg_bot.send_msg(f"🚀 ENTRY: {pair} {signal}\nSL: {clean_sl}\nTP: {clean_tp}\n🧪 {my_strategy.name}")
+
+                            # Capture spread at Open
+                            spread_at_open = my_broker.get_spread(pair)
 
                             trade_data = {
                                 'ticket': result.order,
@@ -290,11 +328,11 @@ def main():
                                 'stop_loss_price': sl,
                                 'take_profit_price': tp,
                                 'volume': volume,
-                                'spread': my_broker.get_spread(pair),
+                                'spread': spread_at_open, # 📝 Log Spread here
                                 'exit_price': 0,
                                 'pnl': 0
                             }
-                            # Log Entry
+                            # Log Entry (Memory Only now)
                             my_cloud.log_trade(trade_data, reason="OPEN")
                             # Save to Memory for the Auditor
                             my_cloud.register_trade(trade_data)

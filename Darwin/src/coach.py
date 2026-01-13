@@ -80,6 +80,9 @@ class Coach:
 
         # 1. ANALYZE BY PAIR (Bench Logic)
         self.check_pairs(closed)
+        
+        # 2. Return the closed df for AI use
+        return closed
 
     def check_pairs(self, df):
         """Checks for toxic pairs."""
@@ -139,30 +142,39 @@ class Coach:
         The AI Brain. 🧠
         Sends trade history to Gemini and asks for strategy updates.
         """
-        if not self.model: 
-            print("   🧢 AI Missing. Skipping optimization.")
+        # 1. Gather Data (Reuse the fetch from audit)
+        closed_df = self.audit_performance()
+        if closed_df is None or closed_df.empty: 
             return
 
+        # CHECK: Only trigger reporting/AI every 20 trades
+        total_closed = len(closed_df)
+        if total_closed > 0 and total_closed % 20 == 0:
+            print(f"   🧢 Coach: 20-Trade Batch Completed ({total_closed} total). Reviewing...")
+        else:
+            # Not a batch interval, silence.
+            return
+
+        # Prepare Report Data
+        recent_history = closed_df.tail(self.lookback_trades)
+        total_pnl = recent_history['PnL'].sum()
+        active_concoction = STRATEGY_STATE.get("ACTIVE_CONCOCTION", [])
+
+        # --- SCENARIO A: NO AI (or AI failure fallback) ---
+        if not self.model:
+            msg = (
+                f"🧢 COACH REPORT (Manual)\n"
+                f"📊 Batch PnL: ${total_pnl:.2f}\n"
+                f"🧪 Active Recipe: {active_concoction}\n"
+                f"⚠️ AI Offline: Optimization skipped."
+            )
+            self.bot.send_msg(msg)
+            return
+
+        # --- SCENARIO B: AI AVAILABLE ---
         print("   🧢 Coach: Consulting the Oracle (Gemini)...")
         
-        # 1. Gather Data
-        df = self.fetch_game_tape()
-        if df.empty: 
-            print("   🧢 Not enough data for AI yet.")
-            return
-
-        # 🛑 STRICT FILTER: Remove 'OPEN' trades, keep only Exits
-        # 'FRIDAY_CLOSE', 'TP_HIT', 'SL_HIT', 'CLOSED_BY_BROKER'
-        closed = df[df['Reason'].isin(self.VALID_EXIT_REASONS)]
-        
-        if len(closed) < 5:
-            print(f"   🧢 Need more closed trades (Found {len(closed)}/5 minimum).")
-            return
-
-        # Grab the last 20 CLOSED trades
-        recent_history = closed.tail(self.lookback_trades).to_json(orient='records')
-        
-        # 2. Construct Prompt
+        recent_history_json = recent_history.to_json(orient='records')
         current_strategy = json.dumps(STRATEGY_STATE, indent=2)
         
         prompt = f"""
@@ -172,7 +184,7 @@ class Coach:
         {current_strategy}
         
         RECENT CLOSED TRADE HISTORY (Last 20 Trades):
-        {recent_history}
+        {recent_history_json}
         
         TASK:
         Analyze recent performance to find the BEST POSSIBLE TRADING COMBINATION.
@@ -201,12 +213,24 @@ class Coach:
             if "ACTIVE_CONCOCTION" in new_state and "PARAMS" in new_state:
                 print("   🧢 Oracle has spoken. Applying updates...")
                 self._update_strategy_file(new_state)
-                self.bot.send_msg(f"🧠 AI UPDATE APPLIED\nRecipe: {new_state['ACTIVE_CONCOCTION']}")
+                
+                # Full AI Report
+                new_recipe = new_state['ACTIVE_CONCOCTION']
+                msg = (
+                    f"🧢 COACH REPORT (AI Powered)\n"
+                    f"📊 Batch PnL: ${total_pnl:.2f}\n"
+                    f"🧪 New Recipe: {new_recipe}\n"
+                    f"🧠 AI: Strategy updated based on performance."
+                )
+                self.bot.send_msg(msg)
             else:
                 print("   ⚠️ Oracle returned invalid JSON structure.")
+                # Fallback report
+                self.bot.send_msg(f"🧢 COACH REPORT\n📊 Batch PnL: ${total_pnl:.2f}\n⚠️ AI Error: Invalid JSON response.")
                 
         except Exception as e:
             print(f"   ❌ AI Optimization Failed: {e}")
+            self.bot.send_msg(f"🧢 COACH REPORT\n📊 Batch PnL: ${total_pnl:.2f}\n❌ AI Failed: {e}")
 
     def _update_strategy_file(self, new_state_dict):
         """
@@ -246,5 +270,5 @@ class Coach:
 
 if __name__ == "__main__":
     c = Coach()
-    c.audit_performance() # Run classic audit
-    c.consult_oracle()    # Run AI audit
+    # c.audit_performance() # Run classic audit
+    c.consult_oracle()    # Run AI audit (which now includes audit)

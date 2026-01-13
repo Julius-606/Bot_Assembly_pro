@@ -45,6 +45,7 @@ BOT_IDENTITY = "trendrunner"
 # --- RISK MANAGEMENT 🛡️ ---
 FIXED_LOT_SIZE = 0.01 
 MAX_OPEN_TRADES = 5 
+MAX_RISK_PER_TRADE_PCT = 0.05 # 5% Maximum Drawdown per trade
 
 # --- MARKET CLASSIFICATION ---
 USER_DEFAULT_MARKETS = [

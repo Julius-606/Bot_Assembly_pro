@@ -1,10 +1,12 @@
 # ==============================================================================
-# ---- Turtle Strategy v1.3.0 ----
+# ---- Turtle Strategy v1.4.0 (Risk Guarded) ----
 # ==============================================================================
 # The Legend Returns. Donchian Channel Breakouts. 🐢
 
 import pandas as pd
 import numpy as np
+import MetaTrader5 as mt5 # Needed for tick value lookups
+from config import FIXED_LOT_SIZE # Needed for monetary risk calc
 
 class Strategy:
     """
@@ -12,13 +14,14 @@ class Strategy:
     "Trade what you see, not what you think."
     """
     def __init__(self, default_params=None):
-        self.name = "Turtle System 1 (Risk Clamped)"
+        self.name = "Turtle System 1 (3% Hard Clamp)"
         # Use injected params or fallback to safe defaults
         self.default_params = default_params if default_params else {
             "donchian_period": 20, 
             "ema_filter": 50,      
             "atr_period": 20,
-            "risk_per_trade": 0.01
+            "risk_per_trade": 0.01,
+            "max_risk_pct": 0.03
         }
 
     def calc_indicators(self, df, params):
@@ -57,34 +60,61 @@ class Strategy:
         atr = curr['atr']
         price = curr['close']
         
-        # 🛡️ RISK CLAMP: Stop loss cannot exceed 1% of price
-        # For Gold @ 2000, max SL distance = $20.
-        max_sl_dist = price * 0.01 
-        
-        # Calculated ATR SL
+        # 1. Base ATR SL Distance
         raw_sl_dist = atr * 2.0
         
-        # Use the smaller of the two (ATR or Max Clamp)
-        final_sl_dist = min(raw_sl_dist, max_sl_dist)
+        # 2. 🛡️ 3% MONETARY RISK CLAMP (The "Anti-Rekt" Shield)
+        balance = cloud.state.get('current_balance', 0)
+        max_risk_pct = params.get('max_risk_pct', 0.03) # Default 3%
         
+        final_sl_dist = raw_sl_dist
+        clamp_msg = None # 🤫 Silence unless triggered
+
+        if balance > 0:
+            # Max dollar amount we can lose (e.g., $100 * 0.03 = $3.00)
+            max_loss_usd = balance * max_risk_pct
+            
+            # Get Symbol Metrics to convert Price Distance -> Dollars
+            sym_info = mt5.symbol_info(pair)
+            if sym_info:
+                tick_value = sym_info.trade_tick_value # Value of 1 tick for 1 lot (e.g. $1 for EURUSD, $0.10 for Gold sometimes)
+                tick_size = sym_info.trade_tick_size   # Size of 1 tick (e.g. 0.00001 or 0.01)
+                
+                # Check for zero division
+                if tick_size > 0 and tick_value > 0:
+                    # Calculate how much $$$ a 1.00 price move is worth for our FIXED_LOT_SIZE
+                    # Formula: (TickValue / TickSize) * Volume
+                    value_per_price_unit = (tick_value / tick_size) * FIXED_LOT_SIZE
+                    
+                    if value_per_price_unit > 0:
+                        # Max Price Distance = Max $$$ / $$$ per unit
+                        max_price_dist_allowed = max_loss_usd / value_per_price_unit
+                        
+                        # Apply Clamp
+                        if raw_sl_dist > max_price_dist_allowed:
+                            # 🤫 Store the message, don't print it yet!
+                            clamp_msg = f"   ⚠️ Risk Clamp: {pair} SL reduced from {raw_sl_dist:.4f} to {max_price_dist_allowed:.4f} (Max -${max_loss_usd:.2f})"
+                            final_sl_dist = max_price_dist_allowed
+
         # --- TURTLE LONG (BUY) ---
-        # 1. Price breaks ABOVE the 20-period High
-        # 2. Price is ABOVE EMA 50 (Trend is Up)
         if (curr['close'] > curr['donchian_high']) and \
            (curr['close'] > curr['ema_filter']):
                
-               # Turtle Logic: SL = 2 * N (ATR)
+               if clamp_msg: print(clamp_msg) # 🗣️ NOW we scream because we are trading
+               
                sl = curr['close'] - final_sl_dist
-               # Modified: TP is extended (4N) or trailing
-               tp = curr['close'] + (final_sl_dist * 2.0) # 1:2 RR
+               # TP is still based on the *original* idea or the clamped one? 
+               # Safe bet: Use clamped distance for RR, or keep original target? 
+               # Let's keep TP at 2x the ACTUAL risk taken to maintain 1:2 RR.
+               tp = curr['close'] + (final_sl_dist * 2.0)
                
                return 'BUY', sl, tp, 'TURTLE_BREAKOUT'
 
         # --- TURTLE SHORT (SELL) ---
-        # 1. Price breaks BELOW the 20-period Low
-        # 2. Price is BELOW EMA 50 (Trend is Down)
         if (curr['close'] < curr['donchian_low']) and \
            (curr['close'] < curr['ema_filter']):
+               
+               if clamp_msg: print(clamp_msg) # 🗣️ NOW we scream because we are trading
                
                sl = curr['close'] + final_sl_dist
                tp = curr['close'] - (final_sl_dist * 2.0)

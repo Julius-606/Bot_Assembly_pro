@@ -64,7 +64,8 @@ DEFAULT_PARAMS = {
     "donchian_period": 20, 
     "ema_filter": 50,      
     "atr_period": 20,
-    "risk_per_trade": 0.01
+    "risk_per_trade": 0.01,
+    "max_risk_pct": 0.05 # 🛡️ Max 5% Risk of Account Balance per trade
 }
 
 # --- RUNNER LOGIC (TRAILING) ---
