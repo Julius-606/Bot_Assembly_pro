@@ -67,12 +67,9 @@ class Coach:
         if df.empty: return
 
         # 🧹 CLEANUP: Strip whitespace from column names automatically
-        # This fixes the issue if you accidentally typed "PnL " in the sheet
         df.columns = df.columns.str.strip()
         
         # 🛡️ LESS STRICT CHECK 🛡️
-        # Before we try to crunch numbers, let's make sure the data actually exists.
-        # If 'PnL' or 'Exit' is missing, we gently bow out instead of crashing.
         required_columns = ['PnL', 'Exit', 'Reason', 'Pair']
         missing = [col for col in required_columns if col not in df.columns]
         
@@ -92,13 +89,61 @@ class Coach:
         
         if closed.empty:
             print("   🧢 Coach: No closed trades to analyze yet.")
-            return
+            return # Return empty implies no data, handled by caller
 
         # 1. ANALYZE BY PAIR (Bench Logic)
         self.check_pairs(closed)
         
         # 2. Return the closed df for AI use
         return closed
+
+    def diagnose(self):
+        """
+        🚑 Returns a quick health check string for the user.
+        Includes stats for the last 30 trades to prove we are reading the tape.
+        """
+        print("   🧢 Coach: Running Diagnostics...")
+        ai_status = "✅ Online" if self.model else "❌ Offline (No Key)"
+        
+        # We call audit_performance to check sheet connection + Bench logic
+        df = self.audit_performance()
+        
+        if df is None or df.empty:
+            return (f"🧢 COACH DIAGNOSTICS\n"
+                    f"🧠 AI Brain: {ai_status}\n"
+                    f"⚠️ Sheet Status: Connection OK, but no valid closed trades found (or missing columns).")
+        
+        # 1. Batch Progress
+        count = len(df)
+        remainder = count % 20
+        trades_needed = 20 - remainder
+        
+        # 2. Last 30 Trades Stats
+        recent_30 = df.tail(30)
+        total_30 = len(recent_30)
+        wins = len(recent_30[recent_30['PnL'] > 0])
+        
+        # Win Rate
+        win_rate = (wins / total_30 * 100) if total_30 > 0 else 0
+        
+        # Profit Factor
+        gross_profit = recent_30[recent_30['PnL'] > 0]['PnL'].sum()
+        gross_loss = abs(recent_30[recent_30['PnL'] < 0]['PnL'].sum())
+        
+        if gross_loss == 0:
+            profit_factor = "∞" # To the moon 🚀
+        else:
+            profit_factor = round(gross_profit / gross_loss, 2)
+        
+        return (f"🧢 COACH DIAGNOSTICS\n"
+                f"🧠 AI Brain: {ai_status}\n"
+                f"📊 Batch Progress: {remainder}/20 collected\n"
+                f"⏳ Next Review: In {trades_needed} trades\n"
+                f"📜 Total History: {count} closed trades\n"
+                f"-----------------------------\n"
+                f"📉 LAST 30 TRADES SNAPSHOT\n"
+                f"🏆 Win Rate: {int(win_rate)}%\n"
+                f"⚖️ Profit Factor: {profit_factor}")
 
     def check_pairs(self, df):
         """Checks for toxic pairs."""

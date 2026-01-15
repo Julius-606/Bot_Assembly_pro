@@ -263,6 +263,10 @@ def main():
                     f"Strategy: {my_strategy.name}"
                 )
                 tg_bot.send_msg(status_msg)
+            elif cmd == "coach":
+                # 🧢 MANUAL DIAGNOSTIC TRIGGER
+                diag_msg = my_coach.diagnose()
+                tg_bot.send_msg(diag_msg)
 
             # Audit existing trades (Logs closes)
             # If a trade closed, we wake up the Coach immediately 🧢
