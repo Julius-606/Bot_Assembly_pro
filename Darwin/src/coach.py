@@ -60,38 +60,36 @@ class Coach:
 
     def audit_performance(self):
         """
-        Original hard-coded logic to audit pairs and bench them if they suck.
-        This runs alongside the AI to ensure basic safety.
+        Runs the full audit cycle: Fetches data, benches toxic pairs, returns DF.
+        This is used by the AUTOMATED cycle (every 20 trades).
         """
         df = self.fetch_game_tape()
         if df.empty: return
 
-        # 🧹 CLEANUP: Strip whitespace from column names automatically
+        # 🧹 CLEANUP
         df.columns = df.columns.str.strip()
         
-        # 🛡️ LESS STRICT CHECK 🛡️
+        # 🛡️ LESS STRICT CHECK
         required_columns = ['PnL', 'Exit', 'Reason', 'Pair']
         missing = [col for col in required_columns if col not in df.columns]
         
         if missing:
             print(f"   ⚠️ Coach Warning: Missing columns {missing} in Google Sheet.")
-            print("   ⚠️ Skipping audit until Sheet headers are fixed.")
-            return # Exit gracefully
+            return 
         
         # Clean Data
         cols = ['PnL', 'Exit']
         for c in cols:
-            # Force numeric, coercion turns errors to NaN
             df[c] = pd.to_numeric(df[c], errors='coerce')
         
-        # 🔍 STRICT FILTERING: Only closed trades
+        # 🔍 STRICT FILTERING
         closed = df[df['Reason'].isin(self.VALID_EXIT_REASONS)]
         
         if closed.empty:
             print("   🧢 Coach: No closed trades to analyze yet.")
-            return # Return empty implies no data, handled by caller
+            return
 
-        # 1. ANALYZE BY PAIR (Bench Logic)
+        # 1. ANALYZE BY PAIR (This triggers the BENCHING side effect)
         self.check_pairs(closed)
         
         # 2. Return the closed df for AI use
@@ -100,40 +98,61 @@ class Coach:
     def diagnose(self):
         """
         🚑 Returns a quick health check string for the user.
-        Includes stats for the last 30 trades to prove we are reading the tape.
+        READ-ONLY mode. Does NOT trigger benching or modify strategy.
         """
-        print("   🧢 Coach: Running Diagnostics...")
+        print("   🧢 Coach: Running Diagnostics (Read-Only)...")
         ai_status = "✅ Online" if self.model else "❌ Offline (No Key)"
         
-        # We call audit_performance to check sheet connection + Bench logic
-        df = self.audit_performance()
+        df = self.fetch_game_tape()
         
+        # 1. Check Connectivity & Headers
         if df is None or df.empty:
             return (f"🧢 COACH DIAGNOSTICS\n"
                     f"🧠 AI Brain: {ai_status}\n"
-                    f"⚠️ Sheet Status: Connection OK, but no valid closed trades found (or missing columns).")
+                    f"⚠️ Sheet Status: Connected, but Sheet is EMPTY (No data rows).")
+
+        df.columns = df.columns.str.strip()
+        required_columns = ['PnL', 'Exit', 'Reason', 'Pair']
+        missing = [col for col in required_columns if col not in df.columns]
         
-        # 1. Batch Progress
-        count = len(df)
+        if missing:
+             return (f"🧢 COACH DIAGNOSTICS\n"
+                    f"🧠 AI Brain: {ai_status}\n"
+                    f"❌ Sheet Error: Missing Columns {missing}.\n"
+                    f"Please check row 1 of your spreadsheet.")
+        
+        # 2. Check Data
+        for c in ['PnL', 'Exit']:
+            df[c] = pd.to_numeric(df[c], errors='coerce')
+            
+        closed = df[df['Reason'].isin(self.VALID_EXIT_REASONS)]
+        
+        if closed.empty:
+             return (f"🧢 COACH DIAGNOSTICS\n"
+                    f"🧠 AI Brain: {ai_status}\n"
+                    f"⚠️ Data Status: Columns OK, but NO CLOSED TRADES found.\n"
+                    f"The bot needs to close a trade (TP/SL/Friday) to have stats.")
+
+        # 3. Generate Stats
+        count = len(closed)
         remainder = count % 20
         trades_needed = 20 - remainder
         
-        # 2. Last 30 Trades Stats
-        recent_30 = df.tail(30)
+        recent_30 = closed.tail(30)
         total_30 = len(recent_30)
         wins = len(recent_30[recent_30['PnL'] > 0])
         
-        # Win Rate
+        # Win Rate (2 Decimal Places)
         win_rate = (wins / total_30 * 100) if total_30 > 0 else 0
         
-        # Profit Factor
         gross_profit = recent_30[recent_30['PnL'] > 0]['PnL'].sum()
         gross_loss = abs(recent_30[recent_30['PnL'] < 0]['PnL'].sum())
         
+        # Profit Factor (4 Decimal Places)
         if gross_loss == 0:
-            profit_factor = "∞" # To the moon 🚀
+            profit_factor = "∞"
         else:
-            profit_factor = round(gross_profit / gross_loss, 2)
+            profit_factor = f"{gross_profit / gross_loss:.4f}"
         
         return (f"🧢 COACH DIAGNOSTICS\n"
                 f"🧠 AI Brain: {ai_status}\n"
@@ -142,7 +161,7 @@ class Coach:
                 f"📜 Total History: {count} closed trades\n"
                 f"-----------------------------\n"
                 f"📉 LAST 30 TRADES SNAPSHOT\n"
-                f"🏆 Win Rate: {int(win_rate)}%\n"
+                f"🏆 Win Rate: {win_rate:.2f}%\n"
                 f"⚖️ Profit Factor: {profit_factor}")
 
     def check_pairs(self, df):

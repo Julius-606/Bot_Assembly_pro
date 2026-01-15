@@ -10,6 +10,8 @@ from datetime import datetime
 # ==============================================================================
 
 
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -48,9 +50,10 @@ STRATEGY_STATE = {
         "FIB_LOOKBACK": 100
     },
     "BENCHED_PAIRS": {
-        "AUDUSD": "2026-01-15 21:15:49",
-        "GBPUSD": "2026-01-15 21:23:04",
-        "EURUSD": "2026-01-15 21:23:04"
+        "AUDUSD": "2026-01-16 03:31:26",
+        "NZDUSD": "2026-01-16 03:31:26",
+        "EURUSD": "2026-01-16 03:31:26",
+        "EURGBP": "2026-01-16 03:31:26"
     },
     "MODE": "STANDARD"
 }
