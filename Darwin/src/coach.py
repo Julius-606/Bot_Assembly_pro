@@ -49,7 +49,7 @@ class Coach:
         try:
             # We use the CloudManager's existing auth to get the sheet
             sheet = self.cloud.sheets_client.open_by_url(self.cloud.sheet_url) 
-            ws = sheet.worksheet("Sheet3")
+            ws = sheet.worksheet("Sheet4")
             data = ws.get_all_records()
             df = pd.DataFrame(data)
             return df

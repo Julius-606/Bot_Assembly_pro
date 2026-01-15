@@ -41,7 +41,7 @@ else:
     GOOGLE_CREDS_DICT = {}
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
-WORKSHEET_LOGS = "Sheet3" 
+WORKSHEET_LOGS = "Sheet4" 
 WORKSHEET_COACH = "Coach Darwin"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
 MEMORY_FILENAME = "darwin_memory.json"
