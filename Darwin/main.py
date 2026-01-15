@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- Trend Runner Main v2.4.0 (Slippery TP + Silence Check) ----
+# ---- Trend Runner Main v2.4.0 (Resilient Edition) ----
 # ==============================================================================
 import sys
 import os
@@ -236,8 +236,8 @@ def main():
     silence_check_interval = 3600 # 1 Hour
 
     # 3. Main Loop
-    try:
-        while True:
+    while True:
+        try:
             # Sync Real Balance
             sync_balance(my_broker, my_cloud)
 
@@ -391,11 +391,15 @@ def main():
 
             time.sleep(10)
 
-    except KeyboardInterrupt:
-        print("\n🛑 Manual Shutdown.")
-    except Exception as e:
-        print(f"📉 CRITICAL CRASH: {e}")
-        tg_bot.send_msg(f"📉 CRITICAL CRASH: {e}")
+        except KeyboardInterrupt:
+            print("\n🛑 Manual Shutdown.")
+            break # Exit the loop only on manual command
+        except Exception as e:
+            # 🛡️ THE CRASH CATCHER
+            # We catch it, print it, notify you, and KEEP GOING.
+            print(f"📉 CRITICAL CRASH: {e}")
+            tg_bot.send_msg(f"📉 CRITICAL CRASH: {e}")
+            time.sleep(10) # Pause for 10s to avoid spamming the logs if it's a persistent error
 
 if __name__ == "__main__":
     main()

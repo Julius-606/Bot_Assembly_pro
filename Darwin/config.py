@@ -55,7 +55,7 @@ BOT_IDENTITY = "darwin"
 # --- RISK MANAGEMENT 🛡️ ---
 FIXED_LOT_SIZE = 0.01 
 MAX_OPEN_TRADES = 5 
-MAX_RISK_PCT = 0.05 # 🛡️ 5% Hard Cap on Risk per Trade
+MAX_RISK_PCT = 0.02 # 🛡️ 2% Hard Cap on Risk per Trade
 
 # --- MARKET CLASSIFICATION ---
 # 📉 PURE FOREX MODE (Full Spectrum)

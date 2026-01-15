@@ -65,6 +65,21 @@ class Coach:
         """
         df = self.fetch_game_tape()
         if df.empty: return
+
+        # 🧹 CLEANUP: Strip whitespace from column names automatically
+        # This fixes the issue if you accidentally typed "PnL " in the sheet
+        df.columns = df.columns.str.strip()
+        
+        # 🛡️ LESS STRICT CHECK 🛡️
+        # Before we try to crunch numbers, let's make sure the data actually exists.
+        # If 'PnL' or 'Exit' is missing, we gently bow out instead of crashing.
+        required_columns = ['PnL', 'Exit', 'Reason', 'Pair']
+        missing = [col for col in required_columns if col not in df.columns]
+        
+        if missing:
+            print(f"   ⚠️ Coach Warning: Missing columns {missing} in Google Sheet.")
+            print("   ⚠️ Skipping audit until Sheet headers are fixed.")
+            return # Exit gracefully
         
         # Clean Data
         cols = ['PnL', 'Exit']
