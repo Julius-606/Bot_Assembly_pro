@@ -8,42 +8,50 @@ import numpy as np
 from datetime import datetime
 
 # ==============================================================================
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
+# The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
 STRATEGY_STATE = {
     "VERSION": "2.0",
-    
-    # The Menu: A catalog of ALL available tools for Gemini to choose from
     "MENU": [
-        "EMA_CROSS",        # Trend: Fast EMA crosses Slow EMA
-        "RSI_FILTER",       # Momentum: Only buy if RSI not overbought
-        "MACD_CONFIRM",     # Momentum: Signal line confirmation
-        "BOLLINGER_SQUEEZE",# Volatility: Trade breakout from low vol
-        "ADX_FILTER",       # Trend Strength: Only trade if ADX > 25
-        "SAR_REVERSAL",     # Trend: Parabolic SAR flips
-        "ICHIMOKU_CLOUD",   # Trend: Price above/below Kumo Cloud
-        "KELTNER_CHANNEL",  # Volatility: Breakout from ATR bands
-        "DONCHIAN_BREAKOUT",# Trend: Turtle Trading (20-day Highs)
-        "STOCH_ENTRY",      # Momentum: Stochastic Cross under 20/ over 80
-        "CCI_MOMENTUM",     # Momentum: CCI > 100 or < -100
-        "FIB_GOLDEN_ZONE"   # Exotic: Price touching 61.8% retracement
+        "EMA_CROSS",
+        "RSI_FILTER",
+        "MACD_CONFIRM",
+        "BOLLINGER_SQUEEZE",
+        "ADX_FILTER",
+        "SAR_REVERSAL",
+        "ICHIMOKU_CLOUD",
+        "KELTNER_CHANNEL",
+        "DONCHIAN_BREAKOUT",
+        "STOCH_ENTRY",
+        "CCI_MOMENTUM",
+        "FIB_GOLDEN_ZONE"
     ],
-
-    # The Active Recipe: What are we cooking today?
-    "ACTIVE_CONCOCTION": ["ICHIMOKU_CLOUD", "ADX_FILTER"],
-
-    # The Flavors: Hyperparameters
+    "ACTIVE_CONCOCTION": [
+        "ICHIMOKU_CLOUD",
+        "ADX_FILTER"
+    ],
     "PARAMS": {
-        "EMA_FAST": 9, "EMA_SLOW": 21,
-        "RSI_PERIOD": 14, "RSI_LIMIT_LOW": 30, "RSI_LIMIT_HIGH": 70,
-        "ATR_PERIOD": 14, "ATR_MULTIPLIER": 1.5, "RISK_REWARD": 2.0,
+        "EMA_FAST": 9,
+        "EMA_SLOW": 21,
+        "RSI_PERIOD": 14,
+        "RSI_LIMIT_LOW": 30,
+        "RSI_LIMIT_HIGH": 70,
+        "ATR_PERIOD": 14,
+        "ATR_MULTIPLIER": 1.5,
+        "RISK_REWARD": 2.0,
         "ADX_THRESHOLD": 25,
         "DONCHIAN_PERIOD": 20,
         "KELTNER_MULT": 2.0,
         "FIB_LOOKBACK": 100
     },
-
-    "BENCHED_PAIRS": {},
+    "BENCHED_PAIRS": {
+        "AUDUSD": "2026-01-15 21:15:49",
+        "GBPUSD": "2026-01-15 21:23:04",
+        "EURUSD": "2026-01-15 21:23:04"
+    },
     "MODE": "STANDARD"
 }
 # ==============================================================================

@@ -39,6 +39,7 @@ class Coach:
         self.lookback_trades = 20 # Analyze last 20 CLOSED trades
         self.panic_threshold = 0.3 # If Win Rate < 30%, something is wrong
         self.bench_duration = 4 # Hours to bench a pair
+        self.silence_threshold_hours = 24 # 💤 How long to wait before shouting at AI
         
         # 🛑 STRICT FILTER: Only look at these rows for analysis
         self.VALID_EXIT_REASONS = ['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT', 'FRIDAY_CLOSE']
@@ -49,7 +50,7 @@ class Coach:
         try:
             # We use the CloudManager's existing auth to get the sheet
             sheet = self.cloud.sheets_client.open_by_url(self.cloud.sheet_url) 
-            ws = sheet.worksheet("Sheet4")
+            ws = sheet.worksheet("Sheet3")
             data = ws.get_all_records()
             df = pd.DataFrame(data)
             return df
@@ -137,6 +138,92 @@ class Coach:
             full_state["BENCHED_PAIRS"] = new_bench_state
             self._update_strategy_file(full_state)
 
+    def check_activity(self):
+        """
+        Checks if the bot has been too quiet (no trades for X hours).
+        Triggers AI to loosen the jar lid if needed.
+        """
+        # 1. Reload memory to get latest state from disk
+        self.cloud.load_memory() 
+        state = self.cloud.state
+        
+        # If we have open trades, we aren't silent. We are active.
+        if len(state.get('open_bot_trades', [])) > 0:
+            return
+
+        # Check last history entry
+        history = state.get('trade_history', [])
+        if not history:
+            return # Brand new bot, let it cook.
+
+        last_trade = history[-1]
+        last_time_str = last_trade.get('open_time', '')
+        
+        try:
+            # Parse time (Format: "2023-10-27 10:00:00")
+            last_entry = datetime.strptime(last_time_str, "%Y-%m-%d %H:%M:%S")
+            time_diff = datetime.now() - last_entry
+            
+            hours_silent = time_diff.total_seconds() / 3600
+            
+            # Threshold Check
+            if hours_silent > self.silence_threshold_hours:
+                print(f"   Note: Bot has been silent for {int(hours_silent)} hours.")
+                self.handle_silence(hours_silent)
+                
+        except Exception as e:
+            # Usually formatting error, ignore
+            pass
+
+    def handle_silence(self, hours):
+        """
+        Asks AI to tune parameters for higher frequency.
+        """
+        print("   🗣️ Silence Detected. Asking AI to increase sensitivity...")
+        self.bot.send_msg(f"🗣️ SILENCE ALERT\nBot hasn't traded in {int(hours)} hours.\nConsulting AI to adjust strategy...")
+        
+        if not self.model:
+            self.bot.send_msg("⚠️ ERROR: AI Key missing. Cannot adjust.")
+            return
+
+        current_strategy = json.dumps(STRATEGY_STATE, indent=2)
+        
+        prompt = f"""
+        You are an expert Forex Algorithmic Trading Coach.
+        
+        CURRENT STRATEGY STATE:
+        {current_strategy}
+        
+        PROBLEM:
+        The bot has been silent (no new trades) for {int(hours)} hours.
+        This means the current indicators are TOO STRICT or the filters are too tight for the current market volatility.
+        
+        TASK:
+        Adjust the 'PARAMS' to be slightly MORE AGGRESSIVE/SENSITIVE to find entries.
+        
+        GUIDELINES:
+        1. Do NOT change the 'ACTIVE_CONCOCTION' (Ingredients). Just tune the numbers.
+        2. Example: Lower ADX threshold, Widen RSI limits, Reduce Moving Average periods.
+        3. Make small, calculated adjustments. Do not go crazy.
+        
+        RESPONSE FORMAT:
+        Return ONLY a raw JSON object representing the NEW STRATEGY_STATE. 
+        Do not use Markdown formatting.
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            raw_text = response.text
+            raw_text = raw_text.replace("```json", "").replace("```", "").strip()
+            new_state = json.loads(raw_text)
+            
+            if "ACTIVE_CONCOCTION" in new_state and "PARAMS" in new_state:
+                print("   🧢 Oracle has updated parameters for activity.")
+                self._update_strategy_file(new_state)
+                self.bot.send_msg(f"✅ ADJUSTMENT APPLIED\nSettings loosened to find more trades.")
+        except Exception as e:
+            print(f"   ❌ Silence Fix Failed: {e}")
+
     def consult_oracle(self):
         """
         The AI Brain. 🧠
@@ -150,7 +237,6 @@ class Coach:
         # CHECK: Only trigger reporting/AI every 20 trades
         total_closed = len(closed_df)
         if total_closed == 0 or total_closed % 20 != 0:
-            # Not a batch interval, silence.
             return
             
         print(f"   🧢 Coach: 20-Trade Batch Completed ({total_closed} total). Analyzing Stats...")
@@ -168,7 +254,6 @@ class Coach:
         win_rate = num_wins / len(recent_history) if len(recent_history) > 0 else 0
         
         # Basic Logic: Is the bot struggling?
-        # Struggling = Negative PnL OR Win Rate < 40%
         ai_assist_needed = (total_pnl < 0) or (win_rate < 0.40)
         
         # Prepare Report String
@@ -182,7 +267,6 @@ class Coach:
 
         # 3. DECISION GATE
         if not ai_assist_needed:
-            # Performance is acceptable. Don't waste API credits.
             print("   🧢 Performance is acceptable. AI consultation skipped.")
             self.bot.send_msg(report_msg + "✅ Status: HEALTHY. No Strategy changes needed.")
             return

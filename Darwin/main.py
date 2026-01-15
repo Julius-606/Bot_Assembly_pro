@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- Trend Runner Main v2.4.0 (Slippery TP Edition) ----
+# ---- Trend Runner Main v2.4.0 (Slippery TP + Silence Check) ----
 # ==============================================================================
 import sys
 import os
@@ -209,6 +209,7 @@ def main():
     print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
     print("   🏃‍♂️ Trailing Logic: ACTIVE (SL Lock + TP Chase)")
     print("   🏖️ Weekend Protocol: ACTIVE")
+    print("   🗣️ Silence Detection: ACTIVE (24h Threshold)")
     
     # 1. Initialize Components
     my_cloud = CloudManager()
@@ -229,6 +230,10 @@ def main():
         sys.exit(1)
 
     tg_bot.send_msg(f"🤖 Trend Runner Online!\nStrategy: {my_strategy.name}")
+
+    # Timer for Silence Check (Don't check every loop, check every hour)
+    last_silence_check = time.time()
+    silence_check_interval = 3600 # 1 Hour
 
     # 3. Main Loop
     try:
@@ -264,6 +269,12 @@ def main():
             if audit_trades(my_broker, my_cloud, tg_bot):
                 print("   🧢 Trade Closed. Waking up the Coach...")
                 my_coach.consult_oracle()
+            
+            # --- 🗣️ SILENCE CHECK ---
+            # If it's been an hour since last check, see if the bot is dead silent
+            if time.time() - last_silence_check > silence_check_interval:
+                my_coach.check_activity()
+                last_silence_check = time.time()
             
             # Manage Running Trades (Trailing SL) 🏃‍♂️
             manage_running_trades(my_broker, my_cloud, tg_bot)
