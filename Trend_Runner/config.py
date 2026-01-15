@@ -48,17 +48,19 @@ MAX_OPEN_TRADES = 5
 MAX_RISK_PER_TRADE_PCT = 0.05 # 5% Maximum Drawdown per trade
 
 # --- MARKET CLASSIFICATION ---
+# 📉 PURE FOREX MODE (Full Spectrum)
 USER_DEFAULT_MARKETS = [
-    "EURUSD", "GBPUSD", "USDJPY", "XAUUSD", "BTCUSD",
-    "ETHUSD", "LTCUSD", "AUDUSD", "NZDUSD", "USDCAD", 
-    "USDCHF", "XAGUSD",
-    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD"
+    # The Majors (The VIPs 💅 - Tight Spreads)
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", "NZDUSD",
+    
+    # The Minors / Crosses (The Volatility Crew 🎢)
+    "EURGBP", "EURJPY", "GBPJPY", "AUDJPY", "NZDJPY", "CADJPY", "CHFJPY",
+    "EURAUD", "EURCAD", "GBPAUD", "GBPCAD", "AUDNZD"
 ]
 
-CRYPTO_MARKETS = [
-    "BTCUSD", "ETHUSD", "LTCUSD", 
-    "XRPUSD", "BNBUSD", "DOGEUSD", "SOLUSD"
-]
+# 24/7 Markets (Empty to disable weekend trading logic)
+CRYPTO_MARKETS = []
+
 
 # --- STRATEGY PARAMETERS ---
 # Controls the sensitivity of the Trend Runner

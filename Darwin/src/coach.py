@@ -49,7 +49,7 @@ class Coach:
         try:
             # We use the CloudManager's existing auth to get the sheet
             sheet = self.cloud.sheets_client.open_by_url(self.cloud.sheet_url) 
-            ws = sheet.worksheet("Trade_Logs")
+            ws = sheet.worksheet("Sheet3")
             data = ws.get_all_records()
             df = pd.DataFrame(data)
             return df
@@ -140,7 +140,7 @@ class Coach:
     def consult_oracle(self):
         """
         The AI Brain. 🧠
-        Sends trade history to Gemini and asks for strategy updates.
+        Calculates Math FIRST. Then decides if AI consultation is needed.
         """
         # 1. Gather Data (Reuse the fetch from audit)
         closed_df = self.audit_performance()
@@ -149,30 +149,52 @@ class Coach:
 
         # CHECK: Only trigger reporting/AI every 20 trades
         total_closed = len(closed_df)
-        if total_closed > 0 and total_closed % 20 == 0:
-            print(f"   🧢 Coach: 20-Trade Batch Completed ({total_closed} total). Reviewing...")
-        else:
+        if total_closed == 0 or total_closed % 20 != 0:
             # Not a batch interval, silence.
             return
+            
+        print(f"   🧢 Coach: 20-Trade Batch Completed ({total_closed} total). Analyzing Stats...")
 
-        # Prepare Report Data
+        # 2. 🧮 DO THE MATH (Internal Analysis)
         recent_history = closed_df.tail(self.lookback_trades)
+        
+        wins = recent_history[recent_history['PnL'] > 0]
+        losses = recent_history[recent_history['PnL'] <= 0]
+        
+        num_wins = len(wins)
+        num_losses = len(losses)
         total_pnl = recent_history['PnL'].sum()
+        
+        win_rate = num_wins / len(recent_history) if len(recent_history) > 0 else 0
+        
+        # Basic Logic: Is the bot struggling?
+        # Struggling = Negative PnL OR Win Rate < 40%
+        ai_assist_needed = (total_pnl < 0) or (win_rate < 0.40)
+        
+        # Prepare Report String
         active_concoction = STRATEGY_STATE.get("ACTIVE_CONCOCTION", [])
+        report_msg = (
+            f"🧢 COACH BATCH REPORT ({total_closed} Trades)\n"
+            f"💰 Batch PnL: ${total_pnl:.2f}\n"
+            f"🏆 Win Rate: {int(win_rate*100)}% ({num_wins}W / {num_losses}L)\n"
+            f"🧪 Current Recipe: {active_concoction}\n"
+        )
 
-        # --- SCENARIO A: NO AI (or AI failure fallback) ---
-        if not self.model:
-            msg = (
-                f"🧢 COACH REPORT (Manual)\n"
-                f"📊 Batch PnL: ${total_pnl:.2f}\n"
-                f"🧪 Active Recipe: {active_concoction}\n"
-                f"⚠️ AI Offline: Optimization skipped."
-            )
-            self.bot.send_msg(msg)
+        # 3. DECISION GATE
+        if not ai_assist_needed:
+            # Performance is acceptable. Don't waste API credits.
+            print("   🧢 Performance is acceptable. AI consultation skipped.")
+            self.bot.send_msg(report_msg + "✅ Status: HEALTHY. No Strategy changes needed.")
             return
 
-        # --- SCENARIO B: AI AVAILABLE ---
-        print("   🧢 Coach: Consulting the Oracle (Gemini)...")
+        # --- SCENARIO: AI INTERVENTION NEEDED ---
+        print("   🧢 Performance Alert! Consulting the Oracle (Gemini)...")
+        report_msg += "⚠️ Status: UNDERPERFORMING. Consulting AI...\n"
+        self.bot.send_msg(report_msg)
+
+        if not self.model:
+            self.bot.send_msg("⚠️ ERROR: AI Key missing. Cannot optimize.")
+            return
         
         recent_history_json = recent_history.to_json(orient='records')
         current_strategy = json.dumps(STRATEGY_STATE, indent=2)
@@ -187,9 +209,11 @@ class Coach:
         {recent_history_json}
         
         TASK:
-        Analyze recent performance to find the BEST POSSIBLE TRADING COMBINATION.
-        1. If PnL is positive, optimize 'PARAMS' for better efficiency.
-        2. If PnL is negative or stagnant, change the 'ACTIVE_CONCOCTION' using ingredients from the 'MENU'.
+        The bot is underperforming (PnL < 0 or Win Rate < 40%).
+        Analyze the losses and propose a NEW Strategy Configuration.
+        
+        1. CHANGE the 'ACTIVE_CONCOCTION' using ingredients from the 'MENU'.
+        2. TWEAK 'PARAMS' to be more conservative or aggressive based on the market.
         3. STRICTLY limit ingredients to the provided 'MENU' list.
         4. Bench toxic pairs in 'BENCHED_PAIRS'.
         
@@ -200,7 +224,7 @@ class Coach:
         """
         
         try:
-            # 3. Ask AI
+            # 4. Ask AI
             response = self.model.generate_content(prompt)
             raw_text = response.text
             
@@ -209,28 +233,20 @@ class Coach:
             
             new_state = json.loads(raw_text)
             
-            # 4. Validate Keys
+            # 5. Validate Keys
             if "ACTIVE_CONCOCTION" in new_state and "PARAMS" in new_state:
                 print("   🧢 Oracle has spoken. Applying updates...")
                 self._update_strategy_file(new_state)
                 
-                # Full AI Report
                 new_recipe = new_state['ACTIVE_CONCOCTION']
-                msg = (
-                    f"🧢 COACH REPORT (AI Powered)\n"
-                    f"📊 Batch PnL: ${total_pnl:.2f}\n"
-                    f"🧪 New Recipe: {new_recipe}\n"
-                    f"🧠 AI: Strategy updated based on performance."
-                )
-                self.bot.send_msg(msg)
+                self.bot.send_msg(f"🧢 ORACLE UPDATE APPLIED\n🆕 New Recipe: {new_recipe}\n🧠 Strategy optimized for recovery.")
             else:
                 print("   ⚠️ Oracle returned invalid JSON structure.")
-                # Fallback report
-                self.bot.send_msg(f"🧢 COACH REPORT\n📊 Batch PnL: ${total_pnl:.2f}\n⚠️ AI Error: Invalid JSON response.")
+                self.bot.send_msg("⚠️ AI Error: Invalid JSON response. Retrying next batch.")
                 
         except Exception as e:
             print(f"   ❌ AI Optimization Failed: {e}")
-            self.bot.send_msg(f"🧢 COACH REPORT\n📊 Batch PnL: ${total_pnl:.2f}\n❌ AI Failed: {e}")
+            self.bot.send_msg(f"❌ AI Failed: {e}. Retrying next batch.")
 
     def _update_strategy_file(self, new_state_dict):
         """
@@ -247,7 +263,7 @@ class Coach:
             new_state_str = new_state_str.replace("true", "True").replace("false", "False").replace("null", "None")
             
             # Regex Magic 🪄
-            start_marker = "# 🧠 AI EXCLUSIVE ZONE (DO NOT EDIT MANUALLY)"
+            start_marker = "# 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)"
             end_marker = "# 🛑 END AI ZONE"
             
             p_start = re.escape(start_marker)

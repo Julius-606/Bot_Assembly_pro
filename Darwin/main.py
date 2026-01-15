@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- Trend Runner Main v2.4.0 ----
+# ---- Trend Runner Main v2.4.0 (Slippery TP Edition) ----
 # ==============================================================================
 import sys
 import os
@@ -47,7 +47,8 @@ def sync_balance(broker, cloud):
 def manage_running_trades(broker, cloud, tg_bot):
     """
     🏃‍♂️ The Trailer.
-    Moves SL to break-even and trails profit.
+    1. Moves SL to break-even and trails profit (Locks in gains).
+    2. Moves TP AWAY from price (Infinite upside).
     """
     if not broker.connected: return
     
@@ -70,16 +71,19 @@ def manage_running_trades(broker, cloud, tg_bot):
         point = symbol_info.point
         
         # CONFIGS (Converted from 'points' to real price delta)
-        # Threshold: Distance to TP before extending (Not used here, simplified to trailing)
-        # We use SL Activation: Distance in profit to trigger trailing
         activation_dist = TRAILING_CONFIG['sl_activation_distance'] * point
         trail_dist = TRAILING_CONFIG['sl_distance'] * point
         
-        # --- BUY LOGIC ---
+        # TP Chase Configs
+        tp_prox_dist = TRAILING_CONFIG['tp_proximity_threshold'] * point
+        tp_ext_dist = TRAILING_CONFIG['tp_extension'] * point
+        
+        # --- BUY LOGIC 📈 ---
         if type_op == 0: 
             profit_distance = price_current - price_open
+            dist_to_tp = tp - price_current
             
-            # 1. Break Even / Trailing
+            # A. TRAILING STOP LOSS (Defense)
             if profit_distance > activation_dist:
                 new_sl = price_current - trail_dist
                 # Only move SL UP
@@ -88,18 +92,33 @@ def manage_running_trades(broker, cloud, tg_bot):
                         "action": mt5.TRADE_ACTION_SLTP,
                         "position": ticket,
                         "sl": float(new_sl),
-                        "tp": float(tp), # Keep existing TP
+                        "tp": float(tp), # Keep existing TP for now
                         "magic": 234000
                     }
-                    res = mt5.order_send(request)
-                    if res.retcode == mt5.TRADE_RETCODE_DONE:
-                        print(f"   🏃‍♂️ Trailed SL for {symbol} to {new_sl}")
+                    mt5.order_send(request)
+                    # print(f"   🏃‍♂️ Trailed SL UP for {symbol}")
 
-        # --- SELL LOGIC ---
+            # B. TRAILING TAKE PROFIT (Offense - "You'll never catch me")
+            if dist_to_tp < tp_prox_dist:
+                new_tp = tp + tp_ext_dist
+                print(f"   🎣 Moving TP AWAY for {symbol} (Chasing the run)...")
+                request = {
+                    "action": mt5.TRADE_ACTION_SLTP,
+                    "position": ticket,
+                    "sl": float(sl), # Keep existing SL
+                    "tp": float(new_tp),
+                    "magic": 234000
+                }
+                res = mt5.order_send(request)
+                if res.retcode == mt5.TRADE_RETCODE_DONE:
+                    tg_bot.send_msg(f"🎣 TP CHASE: {symbol} extended to {new_tp}")
+
+        # --- SELL LOGIC 📉 ---
         elif type_op == 1:
             profit_distance = price_open - price_current
+            dist_to_tp = price_current - tp
             
-            # 1. Break Even / Trailing
+            # A. TRAILING STOP LOSS (Defense)
             if profit_distance > activation_dist:
                 new_sl = price_current + trail_dist
                 # Only move SL DOWN (remember SL is above price for shorts)
@@ -111,9 +130,23 @@ def manage_running_trades(broker, cloud, tg_bot):
                         "tp": float(tp),
                         "magic": 234000
                     }
-                    res = mt5.order_send(request)
-                    if res.retcode == mt5.TRADE_RETCODE_DONE:
-                        print(f"   🏃‍♂️ Trailed SL for {symbol} to {new_sl}")
+                    mt5.order_send(request)
+                    # print(f"   🏃‍♂️ Trailed SL DOWN for {symbol}")
+
+            # B. TRAILING TAKE PROFIT (Offense - "You'll never catch me")
+            if dist_to_tp < tp_prox_dist:
+                new_tp = tp - tp_ext_dist
+                print(f"   🎣 Moving TP AWAY for {symbol} (Chasing the drop)...")
+                request = {
+                    "action": mt5.TRADE_ACTION_SLTP,
+                    "position": ticket,
+                    "sl": float(sl), 
+                    "tp": float(new_tp),
+                    "magic": 234000
+                }
+                res = mt5.order_send(request)
+                if res.retcode == mt5.TRADE_RETCODE_DONE:
+                    tg_bot.send_msg(f"🎣 TP CHASE: {symbol} extended to {new_tp}")
 
 def audit_trades(broker, cloud, tg_bot):
     """
@@ -174,7 +207,7 @@ def main():
     print("\n🚀 INITIALIZING TREND RUNNER V2.4.0...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
     print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
-    print("   🏃‍♂️ Trailing Logic: ACTIVE")
+    print("   🏃‍♂️ Trailing Logic: ACTIVE (SL Lock + TP Chase)")
     print("   🏖️ Weekend Protocol: ACTIVE")
     
     # 1. Initialize Components
