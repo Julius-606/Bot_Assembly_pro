@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- Trend Runner Main v2.4.0 (Resilient Edition) ----
+# ---- Trend Runner Main v2.4.1 (Hindenburg Fix) ----
 # ==============================================================================
 import sys
 import os
@@ -84,9 +84,9 @@ def manage_running_trades(broker, cloud, tg_bot):
             dist_to_tp = tp - price_current
             
             # A. TRAILING STOP LOSS (Defense)
+            # 🛡️ SAFETY: new_sl > sl ensures we ONLY move SL UP (better for us)
             if profit_distance > activation_dist:
                 new_sl = price_current - trail_dist
-                # Only move SL UP
                 if new_sl > sl:
                     request = {
                         "action": mt5.TRADE_ACTION_SLTP,
@@ -99,6 +99,7 @@ def manage_running_trades(broker, cloud, tg_bot):
                     # print(f"   🏃‍♂️ Trailed SL UP for {symbol}")
 
             # B. TRAILING TAKE PROFIT (Offense - "You'll never catch me")
+            # 🎣 CHASE: Moves TP further UP
             if dist_to_tp < tp_prox_dist:
                 new_tp = tp + tp_ext_dist
                 print(f"   🎣 Moving TP AWAY for {symbol} (Chasing the run)...")
@@ -119,9 +120,10 @@ def manage_running_trades(broker, cloud, tg_bot):
             dist_to_tp = price_current - tp
             
             # A. TRAILING STOP LOSS (Defense)
+            # 🛡️ SAFETY: new_sl < sl ensures we ONLY move SL DOWN (better for us)
+            # Added check (sl == 0) to allow setting initial SL if missing
             if profit_distance > activation_dist:
                 new_sl = price_current + trail_dist
-                # Only move SL DOWN (remember SL is above price for shorts)
                 if new_sl < sl or sl == 0:
                     request = {
                         "action": mt5.TRADE_ACTION_SLTP,
@@ -134,6 +136,7 @@ def manage_running_trades(broker, cloud, tg_bot):
                     # print(f"   🏃‍♂️ Trailed SL DOWN for {symbol}")
 
             # B. TRAILING TAKE PROFIT (Offense - "You'll never catch me")
+            # 🎣 CHASE: Moves TP further DOWN
             if dist_to_tp < tp_prox_dist:
                 new_tp = tp - tp_ext_dist
                 print(f"   🎣 Moving TP AWAY for {symbol} (Chasing the drop)...")
@@ -204,7 +207,7 @@ def check_weekend_chill(broker, cloud, tg_bot):
     return False
 
 def main():
-    print("\n🚀 INITIALIZING TREND RUNNER V2.4.0...")
+    print("\n🚀 INITIALIZING TREND RUNNER V2.4.1 (Hindenburg Fix)...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
     print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
     print("   🏃‍♂️ Trailing Logic: ACTIVE (SL Lock + TP Chase)")
@@ -240,6 +243,10 @@ def main():
         try:
             # Sync Real Balance
             sync_balance(my_broker, my_cloud)
+            
+            # 🛠️ HINDENBURG FIX: Refresh Strategy State EVERY LOOP
+            # This ensures we know who is benched immediately after Coach updates the file
+            my_strategy.refresh_state()
 
             # Check for Telegram Commands
             cmd = tg_bot.get_latest_command()
@@ -267,6 +274,10 @@ def main():
                 # 🧢 MANUAL DIAGNOSTIC TRIGGER
                 diag_msg = my_coach.diagnose()
                 tg_bot.send_msg(diag_msg)
+            elif cmd == "consult":
+                # 🧢 MANUAL FORCE CONSULTATION
+                tg_bot.send_msg("🤖 Force-Consulting the Oracle...")
+                my_coach.consult_oracle(force=True)
 
             # Audit existing trades (Logs closes)
             # If a trade closed, we wake up the Coach immediately 🧢

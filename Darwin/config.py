@@ -46,8 +46,35 @@ WORKSHEET_COACH = "Coach Darwin"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
 MEMORY_FILENAME = "darwin_memory.json"
 
-# --- GEMINI AI CONFIG ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# --- GEMINI AI CONFIG (MULTI-KEY PROTOCOL) ---
+GEMINI_API_KEYS = []
+
+# 1. Look for standard list (PROJECT ORBIT STYLE)
+orbit_keys = os.getenv("GEMINI_API_KEYS_LIST")
+if orbit_keys:
+    try:
+        GEMINI_API_KEYS = json.loads(orbit_keys)
+    except:
+        GEMINI_API_KEYS = [k.strip() for k in orbit_keys.split(',') if k.strip()]
+
+# 2. Look for individual keys (Darwin Classic Style)
+# 🛠️ ROBUSTNESS FIX: Check if user pasted a comma-list into the singular variable
+if not GEMINI_API_KEYS:
+    base_key = os.getenv("GEMINI_API_KEY")
+    if base_key:
+        if ',' in base_key:
+            # User put list in singular var - handle it gracefully
+            GEMINI_API_KEYS = [k.strip() for k in base_key.split(',') if k.strip()]
+        else:
+            GEMINI_API_KEYS.append(base_key)
+    
+    # Also check legacy numbered keys just in case
+    for i in range(2, 6): # Check up to 5 keys
+        next_key = os.getenv(f"GEMINI_API_KEY_{i}")
+        if next_key: GEMINI_API_KEYS.append(next_key)
+
+# Fallback for legacy code
+GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
 
 DEFAULT_STRATEGY = "DARWIN"
 BOT_IDENTITY = "darwin"

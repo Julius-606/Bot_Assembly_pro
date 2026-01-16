@@ -1,13 +1,18 @@
 # ==============================================================================
-# ---- AI STRATEGY ENGINE v2.0 (The Pantry) ----
+# ---- AI STRATEGY ENGINE v2.1 (Self-Aware) ----
 # ==============================================================================
 
 import pandas as pd
-import ta # <--- 🛠️ USING STANDARD 'ta' LIBRARY (No git required)
+import ta 
 import numpy as np
+import importlib
+import sys
 from datetime import datetime
 
 # ==============================================================================
+
+
+
 
 
 
@@ -32,28 +37,28 @@ STRATEGY_STATE = {
         "FIB_GOLDEN_ZONE"
     ],
     "ACTIVE_CONCOCTION": [
-        "ICHIMOKU_CLOUD",
-        "ADX_FILTER"
+        "RSI_FILTER",
+        "MACD_CONFIRM",
+        "STOCH_ENTRY"
     ],
     "PARAMS": {
-        "EMA_FAST": 9,
-        "EMA_SLOW": 21,
+        "EMA_FAST": 10,
+        "EMA_SLOW": 25,
         "RSI_PERIOD": 14,
         "RSI_LIMIT_LOW": 30,
         "RSI_LIMIT_HIGH": 70,
         "ATR_PERIOD": 14,
-        "ATR_MULTIPLIER": 1.5,
+        "ATR_MULTIPLIER": 2.5,
         "RISK_REWARD": 2.0,
-        "ADX_THRESHOLD": 25,
+        "ADX_THRESHOLD": 30,
         "DONCHIAN_PERIOD": 20,
         "KELTNER_MULT": 2.0,
         "FIB_LOOKBACK": 100
     },
     "BENCHED_PAIRS": {
-        "AUDUSD": "2026-01-16 03:31:26",
-        "NZDUSD": "2026-01-16 03:31:26",
-        "EURUSD": "2026-01-16 03:31:26",
-        "EURGBP": "2026-01-16 03:31:26"
+        "AUDUSD": "2026-01-16 19:56:40",
+        "EURGBP": "2026-01-16 19:56:40",
+        "NZDUSD": "2026-01-16 22:33:16"
     },
     "MODE": "STANDARD"
 }
@@ -63,19 +68,48 @@ STRATEGY_STATE = {
 
 class Strategy:
     """
-    Darwin v2.0 🧬
+    Darwin v2.1 🧬
     """
     def __init__(self):
-        # Dynamic Name based on Active Ingredients
-        ingredients = "+".join(STRATEGY_STATE['ACTIVE_CONCOCTION'])
-        self.name = f"Darwin v{STRATEGY_STATE['VERSION']} ({ingredients})"
+        # Initial Load
         self.state = STRATEGY_STATE
+        self.update_name()
+
+    def update_name(self):
+        ingredients = "+".join(self.state['ACTIVE_CONCOCTION'])
+        self.name = f"Darwin v{self.state['VERSION']} ({ingredients})"
+
+    def refresh_state(self):
+        """
+        🛠️ HINDENBURG FIX:
+        Reloads the module itself to pick up changes made by the Coach
+        to the STRATEGY_STATE dict on disk.
+        """
+        try:
+            # 1. Reload the current module
+            importlib.reload(sys.modules[__name__])
+            
+            # 2. Update the instance's reference to the new variable
+            # We access the module from sys.modules to get the fresh object
+            new_state = sys.modules[__name__].STRATEGY_STATE
+            self.state = new_state
+            
+            # 3. Update Name
+            self.update_name()
+            # print("   🧬 Strategy State Refreshed (Hot-Reload).")
+        except Exception as e:
+            print(f"   ⚠️ Strategy Refresh Failed: {e}")
 
     def check_bench(self, pair):
         benched_until = self.state["BENCHED_PAIRS"].get(pair)
         if benched_until:
             lift_time = datetime.strptime(benched_until, "%Y-%m-%d %H:%M:%S")
-            return datetime.now() < lift_time
+            # If now is BEFORE lift time, we are still benched.
+            is_benched = datetime.now() < lift_time
+            if is_benched:
+                # print(f"   🚫 {pair} is warming the bench until {benched_until}")
+                pass
+            return is_benched
         return False
 
     def calc_indicators(self, df):
