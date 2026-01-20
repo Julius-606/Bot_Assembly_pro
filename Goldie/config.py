@@ -41,10 +41,10 @@ else:
     GOOGLE_CREDS_DICT = {}
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
-WORKSHEET_LOGS = "Sheet4" 
-WORKSHEET_COACH = "Coach Darwin"
+WORKSHEET_LOGS = "Sheet5" 
+WORKSHEET_COACH = "Coach Goldie Locks"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
-MEMORY_FILENAME = "darwin_memory.json"
+MEMORY_FILENAME = "goldie_locks_memory.json"
 
 # --- GEMINI AI CONFIG (MULTI-KEY PROTOCOL) ---
 GEMINI_API_KEYS = []
@@ -76,13 +76,13 @@ if not GEMINI_API_KEYS:
 # Fallback for legacy code
 GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
 
-DEFAULT_STRATEGY = "DARWIN"
-BOT_IDENTITY = "darwin"
+DEFAULT_STRATEGY = "goldie_locks_v1"
+BOT_IDENTITY = "goldie_locks"
 
 # --- RISK MANAGEMENT 🛡️ ---
-FIXED_LOT_SIZE = 0.02 
-MAX_OPEN_TRADES = 8
-MAX_RISK_PCT = 0.03 # 🛡️ 3% Hard Cap on Risk per Trade
+FIXED_LOT_SIZE = 0.01
+MAX_OPEN_TRADES = 3
+MAX_RISK_PCT = 0.05 # 🛡️ 5% Hard Cap on Risk per Trade
 
 # --- MARKET CLASSIFICATION ---
 # 📉 PURE FOREX MODE (Full Spectrum)
