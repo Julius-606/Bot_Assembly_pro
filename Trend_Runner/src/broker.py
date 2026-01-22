@@ -82,6 +82,45 @@ class BrokerAPI:
         # 🛡️ SAFETY OVERRIDE
         return FIXED_LOT_SIZE
 
+    def validate_sl_for_risk(self, symbol, is_long, entry, proposed_sl, volume, risk_limit_usd):
+        """
+        🛡️ The Enforcer.
+        Checks if the proposed SL exceeds the dollar risk limit.
+        If it does, it calculates a NEW SL that respects the limit.
+        Returns: (new_sl, was_adjusted)
+        """
+        if not self.connected: return proposed_sl, False
+
+        symbol_info = mt5.symbol_info(symbol)
+        if not symbol_info: return proposed_sl, False
+
+        # Calculate Contract Size (e.g., 100,000 for Forex, 100 for Gold)
+        contract_size = symbol_info.trade_contract_size
+        
+        # Calculate Potential Loss in Quote Currency
+        # Loss = Volume * ContractSize * PriceDifference
+        price_diff = abs(entry - proposed_sl)
+        potential_loss = volume * contract_size * price_diff
+
+        # If we are within limits, return original
+        if potential_loss <= risk_limit_usd:
+            return proposed_sl, False
+
+        # If we exceeded limit, calculate MAX allowed price difference
+        # MaxDiff = RiskLimit / (Volume * ContractSize)
+        max_price_diff = risk_limit_usd / (volume * contract_size)
+
+        # Apply new diff to entry
+        if is_long:
+            new_sl = entry - max_price_diff
+        else:
+            new_sl = entry + max_price_diff
+
+        # Round to digits
+        new_sl = round(new_sl, symbol_info.digits)
+        
+        return new_sl, True
+
     def get_filling_mode(self, symbol):
         """
         Dynamically finds the supported filling mode for the symbol.

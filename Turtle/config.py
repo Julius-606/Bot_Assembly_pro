@@ -1,50 +1,88 @@
-# ==============================================================================
-# ---- Turtle Config v1.3.0 ----
-# ==============================================================================
 import os
 import sys
+import json
+from dotenv import load_dotenv
+
+# ------------------------------------------------------------------------------
+# 🔐 LOAD SECRETS (ENV)
+# ------------------------------------------------------------------------------
+# Load the .env file from the root directory
+load_dotenv()
 
 # ==============================================================================
-# 🔐 SECRET SAUCE (CREDENTIALS)
+# ---- Darwin Config ----
 # ==============================================================================
 
-TELEGRAM_BOT_TOKEN = "8141234434:AAFaO3z4NCASSFYwYkH4t1Q4lkA0Us7x_qA" 
-TELEGRAM_CHAT_ID = "6882899041"
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # --- MT5 SPECIFIC LOGINS ---
-MT5_LOGIN = 105144696
-MT5_PASSWORD = "(yeVM<s4"
-MT5_SERVER = "FBS-Demo"
-MT5_PATH = r"C:\Program Files\MetaTrader 5 - Turtle\terminal64.exe"
+MT5_LOGIN = int(os.getenv("MT5_LOGIN", 0)) 
+MT5_PASSWORD = os.getenv("MT5_PASSWORD")
+MT5_SERVER = os.getenv("MT5_SERVER")
+MT5_PATH = os.getenv("MT5_PATH")
 
-# --- GOOGLE CLOUD CONFIG ---
-GOOGLE_CREDS = r"""
-{
-  "type": "service_account",
-  "project_id": "mt5-algo-bot-logger",
-  "private_key_id": "9d9b7fd070ca090bfc87027a9273d5160a5c8420",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCjmyj6r07CHHOi\nFfULyqv/oMG3dvBUCGK8AZqAAZ6ZfuEFhlBuYT1TQ04wK9r4ol8BitIKvCZYMj9b\n0SIYfrOqJx+zGbgRE4m2WezvcmHxNoYPYW5eIgRnetgTniOGjDGcM9+Y8GZInbb8\nBx63z5RNmJdUTcke7v04XQeVSvyX6ug9eQRAjXxIGPExBgkf5ZsZqcVNqXNQPqaE\nLprKwAStLDFNZh3k5rXpqIfVaefGUueA+Wtv4ncTsgOtRmFPRxM1cDDZnQcV07yt\n+vu5aLeFWyssdcT7ZYn6+0Ubxg1msen/wK3KZ+sKUp1enyp09Lx8rOXY8UNG7ita\npQAvrZQFAgMBAAECggEADOboSyamixvDybE6FyE3Qaw7gpycVMApiyKEPNqD156A\nH9epAZ9k/us0oAthVBC39c7tBAA09OkXgoXiTrS1NfKqZw0c7SnRhyId0389dpCC\nb3WTRtSfbMqs/hUPP6XQJr2XgT/aDRl06/iixUOXMixZqMIOnYQiz35UogMdGtzA\n9kFaxXE9AgIoxuj37w1+1LKuMkyL/CNi0/BB0CJhF+AP6AqQ+m5L/f1TN3Bt6VNl\nm7UH3dyZvKlnvn4H4ZuiHhPmbUU6s9sJWt22Mr7dwK21+RiahW/SITDGgkaraPw8\nag/zABaJNpdEXZal8HU8pUuDMyNK0luNiMzQxXNMmQKBgQDaHTvpjknesW0rI/LQ\nIX5uu5dCAd+jDfJXsmHs9kPyEam0nE1OArtkm8Cftn6KbmO1eEwLWsBnsdM4Zpmq\nryHaz+0bvhXwdYgY/DuE39vIVZDp331uq4eqZCMv18XCA6cyKKEimnq9kiKgagL3\nHro5Ryuilo3JvTaLAZJSIJEIvQKBgQDABiTOkui8q7oJlg80ru4049YQFTP8e6Of\nzXk6VhqBeZWLHPtKDqlCdHbTF922lvZktq42txu3Bt7pAEY8RYxmMSE6uDS0IArK\nP5U76Eu8f+ZCM6rMq2lxOossQkViU1H6A6kLdsgsfCOCBXA53rVmN9ZpG44QHIo4\n3jNuIrkg6QKBgCsTYPS0TDR11/iQJfEi3ERkOfAoTJF4PKdDLIHO9QZGpLxtrfq9\nIWMyO22PbhhKythZBLOtXZhdDzjxUmHaKpZ7P/mdpdmSbKl6jwqj51T+SRtXLv9/\nUtC87BITzBOQAyIt0fzyg1ETHlGN/j3tzJtpSd3XW/M+shnr2ojrs5kFAoGBALfh\nqkF/AQwbTm17m1gR494WB5kjFMNFCq0usFYiugMekQvEVwbV/1O5/0ep5RDCg3Ry\nU2Xl9s5P8Aojzx5MY2RAy9dVKnMK9Ao01Q2nJ099Etx2aarQwopBS6C4XYUI0Mmf\n07M8rfebcM1Ds/JWyFL4SYQhdOsMyXgnoAxph+pxAoGBAM35NHood4AoSWrnu2Cg\nn4sLu5Veti/STPUByK1kWpNQ9ZNSJuANoI5nsIIc4xoQq+cLqCbplnGFAYkHx8Lv\nlakli45t4in6vqDDkL6mBe6mBP5erljT5BFLJ09DDvmcT9YOfbgkOFqY/bbWDVBj\n7xHAN8knILhHIPVeiKet0u0z\n-----END PRIVATE KEY-----\n",
-  "client_email": "mt5-logger-sa@mt5-algo-bot-logger.iam.gserviceaccount.com",
-  "client_id": "101479527830343877881",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/mt5-logger-sa%40mt5-algo-bot-logger.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
-"""
+# --- GOOGLE CLOUD CONFIG (DIRECT JSON) ---
+# We read the raw JSON string from .env instead of a file path
+google_json_str = os.getenv("GOOGLE_CREDS")
+
+if google_json_str:
+    try:
+        # We parse it here just to make sure it's valid, 
+        # then pass the dictionary to cloud.py later (or re-dump it if needed)
+        # But wait, CloudManager expects the DICT or credentials object.
+        # We will pass the dictionary directly.
+        GOOGLE_CREDS_DICT = json.loads(google_json_str)
+    except json.JSONDecodeError as e:
+        print(f"⚠️ CONFIG ERROR: Your GOOGLE_CREDS in .env is not valid JSON.\n{e}")
+        GOOGLE_CREDS_DICT = {}
+else:
+    print("⚠️ CONFIG ERROR: GOOGLE_CREDS not found in .env")
+    GOOGLE_CREDS_DICT = {}
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
-WORKSHEET_LOGS = "Sheet2"
+WORKSHEET_LOGS = "Sheet2" 
+WORKSHEET_COACH = "Coach Turtle"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
-MEMORY_FILENAME = "turtle_memor.json"
+MEMORY_FILENAME = "turtle_memory.json"
 
-DEFAULT_STRATEGY = "TURTLE"
+# --- GEMINI AI CONFIG (MULTI-KEY PROTOCOL) ---
+GEMINI_API_KEYS = []
+
+# 1. Look for standard list (PROJECT ORBIT STYLE)
+orbit_keys = os.getenv("GEMINI_API_KEYS_LIST")
+if orbit_keys:
+    try:
+        GEMINI_API_KEYS = json.loads(orbit_keys)
+    except:
+        GEMINI_API_KEYS = [k.strip() for k in orbit_keys.split(',') if k.strip()]
+
+# 2. Look for individual keys (Darwin Classic Style)
+# 🛠️ ROBUSTNESS FIX: Check if user pasted a comma-list into the singular variable
+if not GEMINI_API_KEYS:
+    base_key = os.getenv("GEMINI_API_KEY")
+    if base_key:
+        if ',' in base_key:
+            # User put list in singular var - handle it gracefully
+            GEMINI_API_KEYS = [k.strip() for k in base_key.split(',') if k.strip()]
+        else:
+            GEMINI_API_KEYS.append(base_key)
+    
+    # Also check legacy numbered keys just in case
+    for i in range(2, 6): # Check up to 5 keys
+        next_key = os.getenv(f"GEMINI_API_KEY_{i}")
+        if next_key: GEMINI_API_KEYS.append(next_key)
+
+# Fallback for legacy code
+GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
+
+DEFAULT_STRATEGY = "turtle_v1"
 BOT_IDENTITY = "turtle"
 
 # --- RISK MANAGEMENT 🛡️ ---
-FIXED_LOT_SIZE = 0.01 
-MAX_OPEN_TRADES = 5 
+FIXED_LOT_SIZE = 0.01
+MAX_OPEN_TRADES = 5
+MAX_RISK_PCT = 0.03 # 🛡️ 3% Hard Cap on Risk per Trade
 
 # --- MARKET CLASSIFICATION ---
 # 📉 PURE FOREX MODE (Full Spectrum)
@@ -60,16 +98,13 @@ USER_DEFAULT_MARKETS = [
 # 24/7 Markets (Empty to disable weekend trading logic)
 CRYPTO_MARKETS = []
 
-# --- TURTLE PARAMETERS ---
 DEFAULT_PARAMS = {
-    "donchian_period": 20, 
-    "ema_filter": 50,      
-    "atr_period": 20,
-    "risk_per_trade": 0.01,
-    "max_risk_pct": 0.05 # 🛡️ Max 5% Risk of Account Balance per trade
+    "ema_fast": 9, 
+    "ema_slow": 21,      
+    "atr_period": 14,
+    "risk_per_trade": 0.01
 }
 
-# --- RUNNER LOGIC (TRAILING) ---
 TRAILING_CONFIG = {
     "tp_proximity_threshold": 50, 
     "tp_extension": 200,

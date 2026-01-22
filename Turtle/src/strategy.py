@@ -1,124 +1,281 @@
 # ==============================================================================
-# ---- Turtle Strategy v1.4.0 (Risk Guarded) ----
+# ---- AI STRATEGY ENGINE v2.1 (Self-Aware) ----
 # ==============================================================================
-# The Legend Returns. Donchian Channel Breakouts. 🐢
 
 import pandas as pd
+import ta 
 import numpy as np
-import MetaTrader5 as mt5 # Needed for tick value lookups
-from config import FIXED_LOT_SIZE # Needed for monetary risk calc
+import importlib
+import sys
+from datetime import datetime
+
+# ==============================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
+# The Coach (coach.py) uses Regex to surgically update this block.
+# ==============================================================================
+STRATEGY_STATE = {
+    "VERSION": "2.0",
+    "MENU": [
+        "EMA_CROSS",
+        "RSI_FILTER",
+        "MACD_CONFIRM",
+        "BOLLINGER_SQUEEZE",
+        "ADX_FILTER",
+        "SAR_REVERSAL",
+        "ICHIMOKU_CLOUD",
+        "KELTNER_CHANNEL",
+        "DONCHIAN_BREAKOUT",
+        "STOCH_ENTRY",
+        "CCI_MOMENTUM",
+        "FIB_GOLDEN_ZONE"
+    ],
+    "ACTIVE_CONCOCTION": [
+        "EMA_CROSS",
+        "ADX_FILTER",
+        "MACD_CONFIRM"
+    ],
+    "PARAMS": {
+        "EMA_FAST": 10,
+        "EMA_SLOW": 25,
+        "RSI_PERIOD": 10,
+        "RSI_LIMIT_LOW": 30,
+        "RSI_LIMIT_HIGH": 70,
+        "ATR_PERIOD": 14,
+        "ATR_MULTIPLIER": 3.5,
+        "RISK_REWARD": 2.0,
+        "ADX_THRESHOLD": 30,
+        "DONCHIAN_PERIOD": 30,
+        "KELTNER_MULT": 2.0,
+        "FIB_LOOKBACK": 100
+    },
+    "BENCHED_PAIRS": {},
+    "MODE": "STANDARD"
+}
+# ==============================================================================
+# 🛑 END AI ZONE
+# ==============================================================================
 
 class Strategy:
     """
-    The Turtle. 🐢
-    "Trade what you see, not what you think."
+    Darwin v2.1 🧬
     """
-    def __init__(self, default_params=None):
-        self.name = "Turtle System 1 (3% Hard Clamp)"
-        # Use injected params or fallback to safe defaults
-        self.default_params = default_params if default_params else {
-            "donchian_period": 20, 
-            "ema_filter": 50,      
-            "atr_period": 20,
-            "risk_per_trade": 0.01,
-            "max_risk_pct": 0.03
-        }
+    def __init__(self):
+        # Initial Load
+        self.state = STRATEGY_STATE
+        self.update_name()
 
-    def calc_indicators(self, df, params):
+    def update_name(self):
+        ingredients = "+".join(self.state['ACTIVE_CONCOCTION'])
+        self.name = f"Darwin v{self.state['VERSION']} ({ingredients})"
+
+    def refresh_state(self):
+        """
+        🛠️ HINDENBURG FIX:
+        Reloads the module itself to pick up changes made by the Coach
+        to the STRATEGY_STATE dict on disk.
+        """
+        try:
+            # 1. Reload the current module
+            importlib.reload(sys.modules[__name__])
+            
+            # 2. Update the instance's reference to the new variable
+            # We access the module from sys.modules to get the fresh object
+            new_state = sys.modules[__name__].STRATEGY_STATE
+            self.state = new_state
+            
+            # 3. Update Name
+            self.update_name()
+            # print("   🧬 Strategy State Refreshed (Hot-Reload).")
+        except Exception as e:
+            print(f"   ⚠️ Strategy Refresh Failed: {e}")
+
+    def check_bench(self, pair):
+        benched_until = self.state["BENCHED_PAIRS"].get(pair)
+        if benched_until:
+            lift_time = datetime.strptime(benched_until, "%Y-%m-%d %H:%M:%S")
+            # If now is BEFORE lift time, we are still benched.
+            is_benched = datetime.now() < lift_time
+            if is_benched:
+                # print(f"   🚫 {pair} is warming the bench until {benched_until}")
+                pass
+            return is_benched
+        return False
+
+    def calc_indicators(self, df):
+        """Calculates ONLY the ingredients needed for the current recipe using 'ta' lib."""
         if df.empty: return df
+        p = self.state["PARAMS"]
+        recipe = self.state["ACTIVE_CONCOCTION"]
         
-        p = params if params else self.default_params
-        
-        # 1. DONCHIAN CHANNELS
-        # We need the max High of the LAST 20 candles (excluding current)
-        df['donchian_high'] = df['high'].rolling(window=p.get('donchian_period', 20)).max().shift(1)
-        df['donchian_low'] = df['low'].rolling(window=p.get('donchian_period', 20)).min().shift(1)
-        
-        # 2. REGIME FILTER (EMA 50) - Optional but recommended for M15
-        df['ema_filter'] = df['close'].ewm(span=p.get('ema_filter', 50), adjust=False).mean()
-        
-        # 3. VOLATILITY (ATR - N)
-        df['tr0'] = abs(df['high'] - df['low'])
-        df['tr1'] = abs(df['high'] - df['close'].shift(1))
-        df['tr2'] = abs(df['low'] - df['close'].shift(1))
-        df['atr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1).rolling(window=p.get('atr_period', 20)).mean()
-        
+        # Ensure numeric types
+        df['close'] = df['close'].astype(float)
+        df['high'] = df['high'].astype(float)
+        df['low'] = df['low'].astype(float)
+
+        # 1. ESSENTIALS (Risk) - ATR
+        # Manually assign to match old naming convention
+        atr_obj = ta.volatility.AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=p['ATR_PERIOD'])
+        df[f"ATRr_{p['ATR_PERIOD']}"] = atr_obj.average_true_range()
+
+        # 2. TREND
+        if "EMA_CROSS" in recipe:
+            df[f"EMA_{p['EMA_FAST']}"] = ta.trend.EMAIndicator(close=df['close'], window=p['EMA_FAST']).ema_indicator()
+            df[f"EMA_{p['EMA_SLOW']}"] = ta.trend.EMAIndicator(close=df['close'], window=p['EMA_SLOW']).ema_indicator()
+            
+        if "SAR_REVERSAL" in recipe:
+            # 'ta' gives PSAR values directly
+            df['PSAR'] = ta.trend.PSARIndicator(high=df['high'], low=df['low'], close=df['close']).psar()
+            
+        if "ICHIMOKU_CLOUD" in recipe:
+            ichi = ta.trend.IchimokuIndicator(high=df['high'], low=df['low'])
+            df['ISA_9'] = ichi.ichimoku_a()
+            df['ISB_26'] = ichi.ichimoku_b()
+            
+        if "DONCHIAN_BREAKOUT" in recipe:
+            dc = ta.volatility.DonchianChannel(high=df['high'], low=df['low'], close=df['close'], window=p['DONCHIAN_PERIOD'])
+            df[f"DCU_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"] = dc.donchian_channel_hband()
+            df[f"DCL_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"] = dc.donchian_channel_lband()
+            
+        if "ADX_FILTER" in recipe:
+            df['ADX_14'] = ta.trend.ADXIndicator(high=df['high'], low=df['low'], close=df['close'], window=14).adx()
+
+        # 3. MOMENTUM
+        if "RSI_FILTER" in recipe:
+            df[f"RSI_{p['RSI_PERIOD']}"] = ta.momentum.RSIIndicator(close=df['close'], window=p['RSI_PERIOD']).rsi()
+            
+        if "MACD_CONFIRM" in recipe:
+            macd = ta.trend.MACD(close=df['close'])
+            df['MACD_12_26_9'] = macd.macd() # Standard MACD line
+            
+        if "STOCH_ENTRY" in recipe:
+            stoch = ta.momentum.StochasticOscillator(high=df['high'], low=df['low'], close=df['close'])
+            df['STOCHk_14_3_3'] = stoch.stoch()
+            df['STOCHd_14_3_3'] = stoch.stoch_signal()
+            
+        if "CCI_MOMENTUM" in recipe:
+            df['CCI_14_0.015'] = ta.trend.CCIIndicator(high=df['high'], low=df['low'], close=df['close']).cci()
+
+        # 4. VOLATILITY
+        if "BOLLINGER_SQUEEZE" in recipe:
+            bb = ta.volatility.BollingerBands(close=df['close'])
+            df['BBU_5_2.0'] = bb.bollinger_hband()
+            df['BBL_5_2.0'] = bb.bollinger_lband()
+            
+        if "KELTNER_CHANNEL" in recipe:
+            # Manual Keltner Calculation (EMA +/- ATR * Mult)
+            kc_ema = ta.trend.EMAIndicator(close=df['close'], window=20).ema_indicator()
+            kc_atr = ta.volatility.AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=10).average_true_range()
+            mult = p['KELTNER_MULT']
+            df[f"KCUe_20_{mult}"] = kc_ema + (kc_atr * mult)
+            df[f"KCLe_20_{mult}"] = kc_ema - (kc_atr * mult)
+
         return df
 
     def analyze(self, pair, broker, cloud):
-        cloud_params = cloud.state.get('strategy_params', {})
-        params = cloud_params if cloud_params else self.default_params
-        
-        # Turtle likes M15 or H1. Let's stick to M15 to match the Runner.
-        df = broker.get_data(pair, timeframe=15, n=200) 
-        
-        if df is None: return None, None, None, None
+        if self.check_bench(pair): return None, None, None, None
 
-        # Calculate indicators
-        df = self.calc_indicators(df, params)
+        df = broker.get_data(pair, timeframe=15, n=300)
+        if df is None or df.empty: return None, None, None, None
+        
+        df = self.calc_indicators(df)
         curr = df.iloc[-1]
-        atr = curr['atr']
-        price = curr['close']
+        prev = df.iloc[-2]
+        p = self.state["PARAMS"]
+        recipe = self.state["ACTIVE_CONCOCTION"]
         
-        # 1. Base ATR SL Distance
-        raw_sl_dist = atr * 2.0
+        # VOTING SYSTEM
+        buy_vote = True
+        sell_vote = True
         
-        # 2. 🛡️ 3% MONETARY RISK CLAMP (The "Anti-Rekt" Shield)
-        balance = cloud.state.get('current_balance', 0)
-        max_risk_pct = params.get('max_risk_pct', 0.03) # Default 3%
-        
-        final_sl_dist = raw_sl_dist
-        clamp_msg = None # 🤫 Silence unless triggered
+        # --- TREND LOGIC ---
+        if "EMA_CROSS" in recipe:
+            fast, slow = curr[f"EMA_{p['EMA_FAST']}"], curr[f"EMA_{p['EMA_SLOW']}"]
+            if not (fast > slow): buy_vote = False
+            if not (fast < slow): sell_vote = False
 
-        if balance > 0:
-            # Max dollar amount we can lose (e.g., $100 * 0.03 = $3.00)
-            max_loss_usd = balance * max_risk_pct
+        if "SAR_REVERSAL" in recipe:
+            # Logic: Close > PSAR = Bull
+            psar_val = curr['PSAR']
+            if curr['close'] < psar_val: buy_vote = False
+            if curr['close'] > psar_val: sell_vote = False
+
+        if "ICHIMOKU_CLOUD" in recipe:
+            span_a = curr['ISA_9']
+            span_b = curr['ISB_26']
+            if not (curr['close'] > max(span_a, span_b)): buy_vote = False # Above Cloud
+            if not (curr['close'] < min(span_a, span_b)): sell_vote = False # Below Cloud
+
+        if "DONCHIAN_BREAKOUT" in recipe:
+            upper = prev[f"DCU_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"]
+            lower = prev[f"DCL_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"]
+            if not (curr['close'] > upper): buy_vote = False
+            if not (curr['close'] < lower): sell_vote = False
+
+        # --- MOMENTUM LOGIC ---
+        if "RSI_FILTER" in recipe:
+            rsi = curr[f"RSI_{p['RSI_PERIOD']}"]
+            if rsi > p['RSI_LIMIT_HIGH']: buy_vote = False
+            if rsi < p['RSI_LIMIT_LOW']: sell_vote = False
+
+        if "CCI_MOMENTUM" in recipe:
+            cci = curr['CCI_14_0.015']
+            if cci < 100: buy_vote = False
+            if cci > -100: sell_vote = False
+
+        if "STOCH_ENTRY" in recipe:
+            k, d = curr['STOCHk_14_3_3'], curr['STOCHd_14_3_3']
+            if not (k < 20 and k > d): buy_vote = False 
+            if not (k > 80 and k < d): sell_vote = False
+
+        # --- VOLATILITY LOGIC ---
+        if "KELTNER_CHANNEL" in recipe:
+            upper = curr[f"KCUe_20_{p['KELTNER_MULT']}"]
+            lower = curr[f"KCLe_20_{p['KELTNER_MULT']}"]
+            if curr['close'] < upper: buy_vote = False
+            if curr['close'] > lower: sell_vote = False
+
+        if "ADX_FILTER" in recipe:
+            if curr['ADX_14'] < p['ADX_THRESHOLD']:
+                buy_vote = False; sell_vote = False
+
+        # --- EXOTIC LOGIC ---
+        if "FIB_GOLDEN_ZONE" in recipe:
+            lb = p['FIB_LOOKBACK']
+            high = df['high'].rolling(lb).max().iloc[-1]
+            low = df['low'].rolling(lb).min().iloc[-1]
+            diff = high - low
+            level_618 = high - (diff * 0.618)
+            level_500 = high - (diff * 0.500)
             
-            # Get Symbol Metrics to convert Price Distance -> Dollars
-            sym_info = mt5.symbol_info(pair)
-            if sym_info:
-                tick_value = sym_info.trade_tick_value # Value of 1 tick for 1 lot (e.g. $1 for EURUSD, $0.10 for Gold sometimes)
-                tick_size = sym_info.trade_tick_size   # Size of 1 tick (e.g. 0.00001 or 0.01)
-                
-                # Check for zero division
-                if tick_size > 0 and tick_value > 0:
-                    # Calculate how much $$$ a 1.00 price move is worth for our FIXED_LOT_SIZE
-                    # Formula: (TickValue / TickSize) * Volume
-                    value_per_price_unit = (tick_value / tick_size) * FIXED_LOT_SIZE
-                    
-                    if value_per_price_unit > 0:
-                        # Max Price Distance = Max $$$ / $$$ per unit
-                        max_price_dist_allowed = max_loss_usd / value_per_price_unit
-                        
-                        # Apply Clamp
-                        if raw_sl_dist > max_price_dist_allowed:
-                            # 🤫 Store the message, don't print it yet!
-                            clamp_msg = f"   ⚠️ Risk Clamp: {pair} SL reduced from {raw_sl_dist:.4f} to {max_price_dist_allowed:.4f} (Max -${max_loss_usd:.2f})"
-                            final_sl_dist = max_price_dist_allowed
+            in_zone = level_618 <= curr['close'] <= level_500
+            if not in_zone: buy_vote = False; sell_vote = False 
 
-        # --- TURTLE LONG (BUY) ---
-        if (curr['close'] > curr['donchian_high']) and \
-           (curr['close'] > curr['ema_filter']):
-               
-               if clamp_msg: print(clamp_msg) # 🗣️ NOW we scream because we are trading
-               
-               sl = curr['close'] - final_sl_dist
-               # TP is still based on the *original* idea or the clamped one? 
-               # Safe bet: Use clamped distance for RR, or keep original target? 
-               # Let's keep TP at 2x the ACTUAL risk taken to maintain 1:2 RR.
-               tp = curr['close'] + (final_sl_dist * 2.0)
-               
-               return 'BUY', sl, tp, 'TURTLE_BREAKOUT'
+        # --- EXECUTION ---
+        atr = curr[f"ATRr_{p['ATR_PERIOD']}"]
+        
+        if buy_vote and not sell_vote:
+            sl_dist = atr * p['ATR_MULTIPLIER']
+            sl = curr['close'] - sl_dist
+            tp = curr['close'] + (sl_dist * p['RISK_REWARD'])
+            return 'BUY', sl, tp, f"Darwin_{self.state['VERSION']}"
 
-        # --- TURTLE SHORT (SELL) ---
-        if (curr['close'] < curr['donchian_low']) and \
-           (curr['close'] < curr['ema_filter']):
-               
-               if clamp_msg: print(clamp_msg) # 🗣️ NOW we scream because we are trading
-               
-               sl = curr['close'] + final_sl_dist
-               tp = curr['close'] - (final_sl_dist * 2.0)
-               
-               return 'SELL', sl, tp, 'TURTLE_BREAKOUT'
+        elif sell_vote and not buy_vote:
+            sl_dist = atr * p['ATR_MULTIPLIER']
+            sl = curr['close'] + sl_dist
+            tp = curr['close'] - (sl_dist * p['RISK_REWARD'])
+            return 'SELL', sl, tp, f"Darwin_{self.state['VERSION']}"
 
         return None, None, None, None

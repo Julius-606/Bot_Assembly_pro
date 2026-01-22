@@ -21,7 +21,7 @@ class TelegramBot:
             payload = {"chat_id": self.chat_id, "text": formatted_text}
             requests.post(url, json=payload, timeout=10) # 🛠️ Increased timeout
         except Exception as e:
-            # Fail silently to avoid console spam
+            # We fail silently here to avoid spamming the console
             pass 
 
     def get_latest_command(self):
@@ -32,7 +32,7 @@ class TelegramBot:
             url = f"{self.base_url}/getUpdates"
             params = {"offset": self.last_update_id + 1, "timeout": 1}
             
-            # 🛠️ Increased timeout to 10s
+            # 🛠️ Increased timeout to 10s to handle slow Telegram API
             response = requests.get(url, params=params, timeout=10) 
             
             data = response.json()
@@ -56,7 +56,7 @@ class TelegramBot:
                     parts = msg.split()
                     if not parts: continue
                     
-                    base_cmd = parts[0] 
+                    base_cmd = parts[0]
                     
                     # 1. GLOBAL CALL
                     if base_cmd == "/assemble":
@@ -65,10 +65,11 @@ class TelegramBot:
                     # 2. TARGETED CALL
                     elif base_cmd == f"/{self.identity}":
                         if len(parts) > 1:
-                            cmd_action = parts[1] 
+                            cmd_action = parts[1]
             
             return cmd_action
 
         except Exception as e:
-            # Silence is golden
+            # Silence the timeout error to keep logs clean
+            # print(f"⚠️ Telegram Poll Error: {e}") 
             return None
