@@ -24,6 +24,7 @@ from datetime import datetime
 
 
 
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -62,7 +63,11 @@ STRATEGY_STATE = {
         "KELTNER_MULT": 2.0,
         "FIB_LOOKBACK": 100
     },
-    "BENCHED_PAIRS": {},
+    "BENCHED_PAIRS": {
+        "AUDUSD": "2026-01-22 23:30:33",
+        "EURGBP": "2026-01-22 23:30:33",
+        "AUDNZD": "2026-01-22 23:30:33"
+    },
     "MODE": "STANDARD"
 }
 # ==============================================================================
