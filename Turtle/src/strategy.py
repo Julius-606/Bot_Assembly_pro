@@ -33,6 +33,9 @@ from datetime import datetime
 
 
 
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -53,9 +56,9 @@ STRATEGY_STATE = {
         "FIB_GOLDEN_ZONE"
     ],
     "ACTIVE_CONCOCTION": [
-        "EMA_CROSS",
-        "MACD_CONFIRM",
-        "ADX_FILTER"
+        "KELTNER_CHANNEL",
+        "ADX_FILTER",
+        "RSI_FILTER"
     ],
     "PARAMS": {
         "EMA_FAST": 20,
@@ -66,14 +69,14 @@ STRATEGY_STATE = {
         "ATR_PERIOD": 14,
         "ATR_MULTIPLIER": 2.5,
         "RISK_REWARD": 2.0,
-        "ADX_THRESHOLD": 30,
+        "ADX_THRESHOLD": 35,
         "DONCHIAN_PERIOD": 20,
-        "KELTNER_MULT": 2.0,
+        "KELTNER_MULT": 2.5,
         "FIB_LOOKBACK": 100
     },
     "BENCHED_PAIRS": {
-        "ETHUSD": "2026-01-27 20:25:40",
-        "BTCUSD": "2026-01-27 23:24:08"
+        "BTCUSD": "2026-01-28 08:25:13",
+        "ETHUSD": "2026-01-28 08:25:13"
     },
     "MODE": "STANDARD"
 }

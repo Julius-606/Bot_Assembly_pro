@@ -38,6 +38,9 @@ from datetime import datetime
 
 
 
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -72,8 +75,8 @@ STRATEGY_STATE = {
         "ADX_THRESHOLD": 30
     },
     "BENCHED_PAIRS": {
-        "EURCAD": "2026-01-27 23:23:29",
-        "USDCAD": "2026-01-27 23:23:29"
+        "EURCAD": "2026-01-28 12:47:24",
+        "USDCAD": "2026-01-28 12:47:24"
     },
     "MODE": "STANDARD"
 }

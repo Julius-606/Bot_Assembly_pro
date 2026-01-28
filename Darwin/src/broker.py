@@ -168,6 +168,10 @@ class BrokerAPI:
         # 🛠️ GET CORRECT FILLING MODE
         fill_mode = self.get_filling_mode(symbol)
 
+        # 🛡️ TRUNCATE COMMENT TO 31 CHARS (MT5 LIMIT)
+        # If the strategy name is too long, we cut it to fit.
+        safe_comment = comment[:31]
+
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
@@ -178,12 +182,18 @@ class BrokerAPI:
             "tp": float(tp),
             "deviation": 20,
             "magic": 234000,
-            "comment": comment,
+            "comment": safe_comment, # Use the safe version
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": fill_mode, 
         }
         
         result = mt5.order_send(request)
+        
+        # 🛡️ THE FIX: Check res validity
+        if result is None:
+            print(f"   ❌ Trade Failed: OrderSend returned None (MT5 Error: {mt5.last_error()})")
+            return None
+            
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"   ❌ Trade Failed: {result.comment} (Retcode: {result.retcode})")
             return None
@@ -223,11 +233,23 @@ class BrokerAPI:
             if history:
                 total_profit = sum([d.profit + d.swap + d.commission for d in history])
                 last_deal = history[-1]
+                
+                # 🕵️ DECIPHER CLOSE REASON
+                reason_code = last_deal.reason
+                reason_str = "CLOSED_BY_BROKER" # Default fallback
+                
+                if reason_code == mt5.DEAL_REASON_SL: reason_str = "SL_HIT"
+                elif reason_code == mt5.DEAL_REASON_TP: reason_str = "TP_HIT"
+                elif reason_code == mt5.DEAL_REASON_CLIENT: reason_str = "MANUAL_CLOSE"
+                elif reason_code == mt5.DEAL_REASON_EXPERT: reason_str = "BOT_CLOSE"
+                elif reason_code == mt5.DEAL_REASON_SO: reason_str = "STOP_OUT"
+
                 return {
                     'status': 'closed',
                     'pnl': round(total_profit, 2),
                     'exit_price': last_deal.price,
-                    'close_time': datetime.fromtimestamp(last_deal.time).strftime("%Y-%m-%d %H:%M:%S")
+                    'close_time': datetime.fromtimestamp(last_deal.time).strftime("%Y-%m-%d %H:%M:%S"),
+                    'reason': reason_str # 🚀 Sending the real reason back!
                 }
         except:
             pass

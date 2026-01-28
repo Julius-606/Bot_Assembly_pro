@@ -84,6 +84,13 @@ FIXED_LOT_SIZE = 0.02
 MAX_OPEN_TRADES = 8
 MAX_RISK_PCT = 0.03 # 🛡️ 3% Hard Cap on Risk per Trade
 
+# 🚫 STRICT BLACKLIST (No Metals, No Crypto)
+# Any pair containing these substrings will be rejected immediately.
+BLACKLIST_ASSETS = [
+    "XAU", "XAG", "XPT", "XPD", # Metals (Gold, Silver, Platinum, Palladium)
+    "BTC", "ETH", "LTC", "XRP", "BCH", "EOS", "ADA", "SOL", "DOGE", "SHIB", "DOT", "MATIC", "USDT" # Crypto
+]
+
 # --- MARKET CLASSIFICATION ---
 # 📉 PURE FOREX MODE (Full Spectrum)
 USER_DEFAULT_MARKETS = [
