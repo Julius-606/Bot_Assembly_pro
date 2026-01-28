@@ -75,8 +75,9 @@ STRATEGY_STATE = {
         "FIB_LOOKBACK": 100
     },
     "BENCHED_PAIRS": {
-        "BTCUSD": "2026-01-28 08:25:13",
-        "ETHUSD": "2026-01-28 08:25:13"
+        "BTCUSD": "2050-01-28 08:25:13",
+        "XAUUSD": "2050-01-28 08:25:13",
+        "ETHUSD": "2050-01-28 08:25:13"
     },
     "MODE": "STANDARD"
 }
