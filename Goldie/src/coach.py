@@ -15,6 +15,14 @@ from config import GEMINI_API_KEYS # 🛠️ Import List, not single key
 # 🔇 SILENCE THE GOOGLE WARNING
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+# ==============================================================================
+# 🎮 AI CONTROL MODE
+# ==============================================================================
+# 'FIXED' -> AI CANNOT change 'ACTIVE_CONCOCTION' (Ingredients). Only tunes 'PARAMS'.
+# 'FREE'  -> AI has full control to change 'ACTIVE_CONCOCTION' and 'PARAMS'.
+AI_CONTROL_MODE = "FREE"  # Options: 'FIXED', 'FREE'
+# ==============================================================================
+
 class Coach:
     """
     The Supervisor. 🧢
@@ -45,11 +53,11 @@ class Coach:
         # Calibration Settings
         self.lookback_trades = 20 # Analyze last 20 CLOSED trades
         self.panic_threshold = 0.3 # If Win Rate < 30%, something is wrong
-        self.bench_duration = 4 # Hours to bench a pair
-        self.silence_threshold_hours = 24 # 💤 How long to wait before shouting at AI
+        self.bench_duration = 3 # Hours to bench a pair
+        self.silence_threshold_hours = 12 # 💤 How long to wait before shouting at AI
         
         # 🛑 STRICT FILTER: Only look at these rows for analysis
-        self.VALID_EXIT_REASONS = ['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT', 'FRIDAY_CLOSE']
+        self.VALID_EXIT_REASONS = ['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT', 'FRIDAY_CLOSE', 'MANUAL_CLOSE']
 
     def _initialize_ai(self):
         """Sets up the generative model with the current key."""
@@ -135,7 +143,6 @@ class Coach:
                     available_models.append(m.name)
             
             # Priority Queue
-            # 🛠️ REMOVED '2.0-flash-exp' because it causes Limit: 0 errors
             priorities = [
                 'models/gemini-1.5-flash',
                 'models/gemini-1.5-flash-latest',
@@ -145,7 +152,6 @@ class Coach:
             
             for p in priorities:
                 if p in available_models:
-                    # print(f"   ✅ AI Model Selected: {p}")
                     return p.replace("models/", "")
 
             # Fallback
@@ -156,8 +162,6 @@ class Coach:
             return None
 
         except Exception as e:
-            # If resolve fails (likely due to invalid key), we default. 
-            # If the key is truly invalid, _generate_safe will catch the 400 error later and rotate.
             print(f"   ⚠️ Model Discovery Failed: {e}. Defaulting to 'gemini-1.5-flash'.")
             return 'gemini-1.5-flash'
 
@@ -242,6 +246,7 @@ class Coach:
         if df is None or df.empty:
             return (f"🧢 COACH DIAGNOSTICS\n"
                     f"🧠 AI Brain: {ai_status}\n"
+                    f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                     f"⚠️ Sheet Status: Connected, but Sheet is EMPTY.")
 
         df.columns = df.columns.str.strip()
@@ -262,6 +267,7 @@ class Coach:
         if closed.empty:
              return (f"🧢 COACH DIAGNOSTICS\n"
                     f"🧠 AI Brain: {ai_status}\n"
+                    f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                     f"⚠️ Data Status: No CLOSED trades found.\n"
                     f"{bench_msg}")
 
@@ -279,6 +285,7 @@ class Coach:
         
         return (f"🧢 COACH DIAGNOSTICS\n"
                 f"🧠 AI Brain: {ai_status}\n"
+                f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                 f"📊 Batch Progress: {remainder}/20 collected\n"
                 f"⏳ Next Review: In {trades_needed} trades\n"
                 f"📜 Total History: {count} closed trades\n"
@@ -290,6 +297,20 @@ class Coach:
 
     def check_pairs(self, df):
         """Checks for toxic pairs and updates strategy file."""
+        # 🕒 SORTING FIX: Ensure we are analyzing the LATEST trades
+        # Try to find a column that looks like Time or Date
+        time_col = next((c for c in df.columns if c.lower() in ['close time', 'time', 'date', 'close_time', 'exit time']), None)
+        
+        if time_col:
+            try:
+                # Convert to datetime and sort ascending (old -> new)
+                df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+                df = df.sort_values(by=time_col)
+                # print(f"   📅 Coach: Sorted history by {time_col} to find latest data.")
+            except Exception as e:
+                # print(f"   ⚠️ Coach Sorting Warning: {e}. Using sheet order.")
+                pass
+        
         pairs = df['Pair'].unique()
         state = self.get_current_strategy_state()
         current_benched = state.get("BENCHED_PAIRS", {})
@@ -314,6 +335,7 @@ class Coach:
         for pair in pairs:
             if pair in new_bench_state: continue
 
+            # .tail() now explicitly grabs the NEWEST rows because we sorted above
             pair_data = df[df['Pair'] == pair].tail(self.lookback_trades)
             if len(pair_data) < 3: continue 
             
@@ -424,14 +446,29 @@ class Coach:
         recent_history_json = recent_history.to_json(orient='records')
         current_strategy = json.dumps(state, indent=2)
         
+        # 🎮 AI CONTROL MODE LOGIC
+        if AI_CONTROL_MODE == "FIXED":
+            task_instruction = (
+                "TASK: Bot is underperforming. Optimize 'PARAMS' ONLY.\n"
+                "1. DO NOT CHANGE 'ACTIVE_CONCOCTION'. Keep it EXACTLY as is.\n"
+                "2. TWEAK 'PARAMS' to improve performance based on history.\n"
+            )
+        else: # FREE
+            task_instruction = (
+                "TASK: Bot is underperforming. Propose NEW Strategy Configuration.\n"
+                "1. CHANGE 'ACTIVE_CONCOCTION' from 'MENU' if needed.\n"
+                "2. TWEAK 'PARAMS'.\n"
+                "3. STRICTLY limit ingredients to 'MENU'.\n"
+            )
+
         prompt = f"""
         You are an expert Forex Algorithmic Trading Coach.
         CURRENT STRATEGY STATE: {current_strategy}
         RECENT HISTORY: {recent_history_json}
-        TASK: Bot is underperforming. Propose NEW Strategy Configuration.
-        1. CHANGE 'ACTIVE_CONCOCTION' from 'MENU'.
-        2. TWEAK 'PARAMS'.
-        3. STRICTLY limit ingredients to 'MENU'.
+        CONTROL MODE: {AI_CONTROL_MODE}
+        
+        {task_instruction}
+        
         RESPONSE FORMAT: JSON ONLY of the new STRATEGY_STATE.
         """
         

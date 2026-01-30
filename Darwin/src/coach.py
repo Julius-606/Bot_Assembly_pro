@@ -20,7 +20,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # ==============================================================================
 # 'FIXED' -> AI CANNOT change 'ACTIVE_CONCOCTION' (Ingredients). Only tunes 'PARAMS'.
 # 'FREE'  -> AI has full control to change 'ACTIVE_CONCOCTION' and 'PARAMS'.
-AI_CONTROL_MODE = "FIXED" 
+AI_CONTROL_MODE = "FREE"  # Options: 'FIXED', 'FREE'
 # ==============================================================================
 
 class Coach:
@@ -53,8 +53,8 @@ class Coach:
         # Calibration Settings
         self.lookback_trades = 20 # Analyze last 20 CLOSED trades
         self.panic_threshold = 0.3 # If Win Rate < 30%, something is wrong
-        self.bench_duration = 4 # Hours to bench a pair
-        self.silence_threshold_hours = 24 # 💤 How long to wait before shouting at AI
+        self.bench_duration = 3 # Hours to bench a pair
+        self.silence_threshold_hours = 12 # 💤 How long to wait before shouting at AI
         
         # 🛑 STRICT FILTER: Only look at these rows for analysis
         self.VALID_EXIT_REASONS = ['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT', 'FRIDAY_CLOSE', 'MANUAL_CLOSE']
@@ -297,6 +297,20 @@ class Coach:
 
     def check_pairs(self, df):
         """Checks for toxic pairs and updates strategy file."""
+        # 🕒 SORTING FIX: Ensure we are analyzing the LATEST trades
+        # Try to find a column that looks like Time or Date
+        time_col = next((c for c in df.columns if c.lower() in ['close time', 'time', 'date', 'close_time', 'exit time']), None)
+        
+        if time_col:
+            try:
+                # Convert to datetime and sort ascending (old -> new)
+                df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
+                df = df.sort_values(by=time_col)
+                # print(f"   📅 Coach: Sorted history by {time_col} to find latest data.")
+            except Exception as e:
+                # print(f"   ⚠️ Coach Sorting Warning: {e}. Using sheet order.")
+                pass
+        
         pairs = df['Pair'].unique()
         state = self.get_current_strategy_state()
         current_benched = state.get("BENCHED_PAIRS", {})
@@ -321,6 +335,7 @@ class Coach:
         for pair in pairs:
             if pair in new_bench_state: continue
 
+            # .tail() now explicitly grabs the NEWEST rows because we sorted above
             pair_data = df[df['Pair'] == pair].tail(self.lookback_trades)
             if len(pair_data) < 3: continue 
             

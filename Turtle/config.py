@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ==============================================================================
-# ---- Darwin Config ----
+# ---- Turtle Config ----
 # ==============================================================================
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -76,13 +76,20 @@ if not GEMINI_API_KEYS:
 # Fallback for legacy code
 GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
 
-DEFAULT_STRATEGY = "turtle_v1"
+DEFAULT_STRATEGY = "TURTLE"
 BOT_IDENTITY = "turtle"
 
 # --- RISK MANAGEMENT 🛡️ ---
-FIXED_LOT_SIZE = 0.01
+FIXED_LOT_SIZE = 0.01 
 MAX_OPEN_TRADES = 5
 MAX_RISK_PCT = 0.03 # 🛡️ 3% Hard Cap on Risk per Trade
+
+# 🚫 STRICT BLACKLIST (No Metals, No Crypto)
+# Any pair containing these substrings will be rejected immediately.
+BLACKLIST_ASSETS = [
+    "XAU", "XAG", "XPT", "XPD", # Metals (Gold, Silver, Platinum, Palladium)
+    "BTC", "ETH", "LTC", "XRP", "BCH", "EOS", "ADA", "SOL", "DOGE", "SHIB", "DOT", "MATIC", "USDT" # Crypto
+]
 
 # --- MARKET CLASSIFICATION ---
 # 📉 PURE FOREX MODE (Full Spectrum)

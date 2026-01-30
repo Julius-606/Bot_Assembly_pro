@@ -62,10 +62,13 @@ class TelegramBot:
                     if base_cmd == "/assemble":
                         cmd_action = "status"
                     
-                    # 2. TARGETED CALL
-                    elif base_cmd == f"/{self.identity}":
-                        if len(parts) > 1:
-                            cmd_action = parts[1]
+                    # 2. TARGETED CALL (e.g. /darwin_pause)
+                    # We look for the pattern /{identity}_{command}
+                    # Example: /darwin_pause -> we want 'pause'
+                    elif base_cmd.startswith(f"/{self.identity}_"):
+                         # Remove the prefix "/darwin_" to get the command
+                         prefix_len = len(f"/{self.identity}_")
+                         cmd_action = base_cmd[prefix_len:]
             
             return cmd_action
 

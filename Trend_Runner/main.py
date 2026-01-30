@@ -23,8 +23,8 @@ try:
     from src.strategy import Strategy
     from src.telegram_bot import TelegramBot
     from src.coach import Coach # 🧢 The Boss
-    # Added MAX_RISK_PCT to import
-    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS, MAX_RISK_PCT
+    # Added MAX_RISK_PCT and BLACKLIST_ASSETS to import
+    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS, MAX_RISK_PCT, BLACKLIST_ASSETS
     print("✅ The squad is assembled.")
 except ImportError as e:
     print(f"\n💀 CRITICAL IMPORT ERROR: {e}")
@@ -111,7 +111,9 @@ def manage_running_trades(broker, cloud, tg_bot):
                     "magic": 234000
                 }
                 res = mt5.order_send(request)
-                if res.retcode == mt5.TRADE_RETCODE_DONE:
+                
+                # 🛡️ THE FIX: Check res validity
+                if res and res.retcode == mt5.TRADE_RETCODE_DONE:
                     tg_bot.send_msg(f"🎣 TP CHASE: {symbol} extended to {new_tp}")
 
         # --- SELL LOGIC 📉 ---
@@ -148,7 +150,9 @@ def manage_running_trades(broker, cloud, tg_bot):
                     "magic": 234000
                 }
                 res = mt5.order_send(request)
-                if res.retcode == mt5.TRADE_RETCODE_DONE:
+                
+                # 🛡️ THE FIX: Check res validity
+                if res and res.retcode == mt5.TRADE_RETCODE_DONE:
                     tg_bot.send_msg(f"🎣 TP CHASE: {symbol} extended to {new_tp}")
 
 def audit_trades(broker, cloud, tg_bot):
@@ -176,9 +180,12 @@ def audit_trades(broker, cloud, tg_bot):
                 trade['close_time'] = status['close_time']
                 trade['pnl'] = status['pnl']
                 
-                cloud.log_trade(trade, reason="CLOSED_BY_BROKER") 
+                # 🛠️ USE THE REAL REASON FROM BROKER IF AVAILABLE
+                exit_reason = status.get('reason', "CLOSED_BY_BROKER")
+                
+                cloud.log_trade(trade, reason=exit_reason) 
                 cloud.deregister_trade(ticket)
-                tg_bot.send_msg(f"💰 TRADE CLOSED: {trade['pair']}\nPnL: {trade['pnl']}")
+                tg_bot.send_msg(f"💰 TRADE CLOSED: {trade['pair']}\nPnL: {trade['pnl']}\n({exit_reason})")
                 trade_closed_flag = True
     
     return trade_closed_flag
@@ -186,30 +193,55 @@ def audit_trades(broker, cloud, tg_bot):
 def check_weekend_chill(broker, cloud, tg_bot):
     """
     🏖️ The Friday Chill Protocol
-    Closes all Forex trades on Friday evening (after 20:00).
-    Keeps Crypto running.
+    Closes all Forex trades on Friday evening (after 20:00) AND prevents trading on Sat/Sun.
+    Keeps Crypto running (though Crypto is likely blocked by STRICT settings now).
     """
     now = datetime.now()
-    # Friday = 4. Check if it's Friday and past 20:00 (8 PM)
-    if now.weekday() == 4 and now.hour >= 20:
+    weekday = now.weekday()
+    hour = now.hour
+    
+    # 1. Friday Night (After 20:00)
+    is_friday_close = (weekday == 4 and hour >= 20)
+    # 2. Weekend (Saturday 5, Sunday 6)
+    is_weekend = (weekday == 5 or weekday == 6)
+
+    # 🛑 TRIGGER CONDITION: Friday Night OR Full Weekend
+    if is_friday_close or is_weekend:
         open_trades = cloud.state.get('open_bot_trades', [])
         for trade in open_trades[:]:
             pair = trade['pair']
             if pair not in CRYPTO_MARKETS:
                 print(f"   🏖️ Weekend Chill: Closing {pair}...")
+                
                 # Close trade
                 is_long = trade['signal'] == 'BUY'
                 if broker.close_trade(trade['ticket'], pair, trade['volume'], is_long):
-                    tg_bot.send_msg(f"🏖️ WEEKEND EXIT: {pair}")
+                    
+                    # ⏳ Wait a beat for MT5 to process the history
+                    time.sleep(2)
+                    
+                    # 🕵️ Fetch the P/L details immediately
+                    status = broker.check_trade_status(trade['ticket'])
+                    if status['status'] == 'closed':
+                        trade['exit_price'] = status['exit_price']
+                        trade['close_time'] = status['close_time']
+                        trade['pnl'] = status['pnl']
+                        tg_bot.send_msg(f"🏖️ WEEKEND EXIT: {pair}\nPnL: {trade['pnl']}")
+                    else:
+                        # Fallback if history isn't ready yet
+                        tg_bot.send_msg(f"🏖️ WEEKEND EXIT: {pair}\n(PnL processing...)")
+
                     cloud.deregister_trade(trade['ticket'])
                     cloud.log_trade(trade, reason="FRIDAY_CLOSE")
-        return True # It IS Friday chill time
+                    
+        return True # It IS weekend chill time
     return False
 
 def main():
     print("\n🚀 INITIALIZING TREND RUNNER V2.4.1 (Hindenburg Fix)...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
     print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
+    print(f"   🚫 Strict Mode: NO METALS or CRYPTO Allowed.")
     print("   🏃‍♂️ Trailing Logic: ACTIVE (SL Lock + TP Chase)")
     print("   🏖️ Weekend Protocol: ACTIVE")
     print("   🗣️ Silence Detection: ACTIVE (24h Threshold)")
@@ -314,6 +346,12 @@ def main():
             active_pairs = my_cloud.state.get('active_pairs', [])
             for pair in active_pairs:
                 
+                # 🚫 STRICT FILTER: NO METALS OR CRYPTO
+                # If the pair contains any blacklisted substring, skip it hard.
+                if any(bad in pair for bad in BLACKLIST_ASSETS):
+                    # print(f"   🚫 Skipping {pair} (Blacklisted)") # Optional: Uncomment to debug
+                    continue
+
                 # 🛑 DUPLICATE CHECK
                 if pair in active_trade_pairs: continue
 

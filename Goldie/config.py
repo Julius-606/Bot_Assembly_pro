@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ==============================================================================
-# ---- Darwin Config ----
+# ---- Goldie Locks Config ----
 # ==============================================================================
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
@@ -42,9 +42,9 @@ else:
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1v_5DVdLPntHfPXjHSKK605f5l0m0F4LOTXTsXm1HbIo/edit?usp=sharing"
 WORKSHEET_LOGS = "Sheet5" 
-WORKSHEET_COACH = "Coach Goldie Locks"
+WORKSHEET_COACH = "Coach goldielocks"
 DRIVE_FOLDER_ID = "16ZJgg2S6NriT84AStjhvM9UI3ckp4rEM"
-MEMORY_FILENAME = "goldie_locks_memory.json"
+MEMORY_FILENAME = "goldielocks_memory.json"
 
 # --- GEMINI AI CONFIG (MULTI-KEY PROTOCOL) ---
 GEMINI_API_KEYS = []
@@ -76,13 +76,20 @@ if not GEMINI_API_KEYS:
 # Fallback for legacy code
 GEMINI_API_KEY = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
 
-DEFAULT_STRATEGY = "goldie_locks_v1"
-BOT_IDENTITY = "goldie_locks"
+DEFAULT_STRATEGY = "GOLDIELOCKS"
+BOT_IDENTITY = "goldielocks"
 
 # --- RISK MANAGEMENT 🛡️ ---
-FIXED_LOT_SIZE = 0.01
+FIXED_LOT_SIZE = 0.01 
 MAX_OPEN_TRADES = 3
 MAX_RISK_PCT = 0.05 # 🛡️ 5% Hard Cap on Risk per Trade
+
+# 🚫 STRICT BLACKLIST (No Metals, No Crypto)
+# Any pair containing these substrings will be rejected immediately.
+BLACKLIST_ASSETS = [
+    "XAU", "XAG", "XPT", "XPD", # Metals (Gold, Silver, Platinum, Palladium)
+    "BTC", "ETH", "LTC", "XRP", "BCH", "EOS", "ADA", "SOL", "DOGE", "SHIB", "DOT", "MATIC", "USDT" # Crypto
+]
 
 # --- MARKET CLASSIFICATION ---
 # 📉 PURE FOREX MODE (Full Spectrum)

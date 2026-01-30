@@ -3,7 +3,7 @@ import os
 import subprocess
 import MetaTrader5 as mt5
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import MT5_PATH, MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, FIXED_LOT_SIZE
 
 class BrokerAPI:
@@ -168,9 +168,9 @@ class BrokerAPI:
         # 🛠️ GET CORRECT FILLING MODE
         fill_mode = self.get_filling_mode(symbol)
 
-        # 🛡️ TRUNCATE COMMENT TO 31 CHARS (MT5 LIMIT)
-        # If the strategy name is too long, we cut it to fit.
-        safe_comment = comment[:31]
+        # 🛡️ TRUNCATE COMMENT TO 30 CHARS (MT5 LIMIT IS 31, BUT SAFETY FIRST)
+        # Ensure it's a string to prevent TypeErrors
+        safe_comment = str(comment)[:30]
 
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
@@ -243,12 +243,16 @@ class BrokerAPI:
                 elif reason_code == mt5.DEAL_REASON_CLIENT: reason_str = "MANUAL_CLOSE"
                 elif reason_code == mt5.DEAL_REASON_EXPERT: reason_str = "BOT_CLOSE"
                 elif reason_code == mt5.DEAL_REASON_SO: reason_str = "STOP_OUT"
+                
+                # ⏰ TIMEZONE FIX: Subtract 2 hours from MT5 Server Time
+                exit_time_obj = datetime.fromtimestamp(last_deal.time)
+                exit_time_obj = exit_time_obj - timedelta(hours=2) # Adjusting for SAST/Local vs Server
 
                 return {
                     'status': 'closed',
                     'pnl': round(total_profit, 2),
                     'exit_price': last_deal.price,
-                    'close_time': datetime.fromtimestamp(last_deal.time).strftime("%Y-%m-%d %H:%M:%S"),
+                    'close_time': exit_time_obj.strftime("%Y-%m-%d %H:%M:%S"), # Use adjusted time
                     'reason': reason_str # 🚀 Sending the real reason back!
                 }
         except:

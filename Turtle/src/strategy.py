@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- AI STRATEGY ENGINE v2.1 (Self-Aware) ----
+# ---- AI STRATEGY ENGINE v2.3 (Lite Edition) ----
 # ==============================================================================
 
 import pandas as pd
@@ -21,63 +21,57 @@ from datetime import datetime
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
 STRATEGY_STATE = {
-    "VERSION": "2.0",
+    "VERSION": "3.2",
     "MENU": [
-        "EMA_CROSS",
-        "RSI_FILTER",
-        "MACD_CONFIRM",
-        "BOLLINGER_SQUEEZE",
-        "ADX_FILTER",
-        "SAR_REVERSAL",
-        "ICHIMOKU_CLOUD",
-        "KELTNER_CHANNEL",
-        "DONCHIAN_BREAKOUT",
-        "STOCH_ENTRY",
-        "CCI_MOMENTUM",
-        "FIB_GOLDEN_ZONE"
+        "EMA",
+        "RSI",
+        "MACD",
+        "Bol",
+        "ADX",
+        "SAR",
+        "Ichi",
+        "Kelt",
+        "Donch",
+        "Stoch",
+        "CCI",
+        "Fib",
+        "SMA",
+        "WillR",
+        "MFI",
+        "ROC",
+        "TRIX"
     ],
     "ACTIVE_CONCOCTION": [
-        "KELTNER_CHANNEL",
-        "ADX_FILTER",
-        "RSI_FILTER"
+        "ADX",
+        "Kelt",
+        "RSI"
     ],
     "PARAMS": {
-        "EMA_FAST": 20,
-        "EMA_SLOW": 50,
+        "EMA_FAST": 10,
+        "EMA_SLOW": 21,
         "RSI_PERIOD": 14,
         "RSI_LIMIT_LOW": 30,
         "RSI_LIMIT_HIGH": 70,
         "ATR_PERIOD": 14,
-        "ATR_MULTIPLIER": 2.5,
+        "ATR_MULTIPLIER": 3.0,
         "RISK_REWARD": 2.0,
-        "ADX_THRESHOLD": 35,
-        "DONCHIAN_PERIOD": 20,
-        "KELTNER_MULT": 2.5,
-        "FIB_LOOKBACK": 100
+        "ADX_THRESHOLD": 30,
+        "DONCHIAN_PERIOD": 30,
+        "KELTNER_MULT": 2.0,
+        "FIB_LOOKBACK": 100,
+        "SMA_PERIOD": 200,
+        "WILLIAMS_PERIOD": 14,
+        "MFI_PERIOD": 14,
+        "ROC_PERIOD": 12,
+        "TRIX_PERIOD": 15
     },
     "BENCHED_PAIRS": {
-        "BTCUSD": "2050-01-28 08:25:13",
-        "XAUUSD": "2050-01-28 08:25:13",
-        "ETHUSD": "2050-01-28 08:25:13"
+        "BTCUSD": "2026-01-30 06:44:34",
+        "ETHUSD": "2026-01-30 06:44:34"
     },
     "MODE": "STANDARD"
 }
@@ -87,7 +81,7 @@ STRATEGY_STATE = {
 
 class Strategy:
     """
-    Darwin v2.1 🧬
+    Turtle v2.1 🧬
     """
     def __init__(self):
         # Initial Load
@@ -95,8 +89,9 @@ class Strategy:
         self.update_name()
 
     def update_name(self):
-        ingredients = "+".join(self.state['ACTIVE_CONCOCTION'])
-        self.name = f"Darwin v{self.state['VERSION']} ({ingredients})"
+        # 📝 CHANGE: Removed "Turtle v2.1" prefix. Now it's just the ingredients joined by '+'.
+        # Example: "EMA+MACD+Bol" (12 chars) -> Fits easily in MT5.
+        self.name = "+".join(self.state['ACTIVE_CONCOCTION'])
 
     def refresh_state(self):
         """
@@ -141,6 +136,12 @@ class Strategy:
         df['close'] = df['close'].astype(float)
         df['high'] = df['high'].astype(float)
         df['low'] = df['low'].astype(float)
+        
+        # 🛠️ For MFI, we need volume (MT5 gives tick_volume)
+        if 'tick_volume' in df.columns:
+            volume_col = df['tick_volume']
+        else:
+            volume_col = df['volume'] if 'volume' in df.columns else None
 
         # 1. ESSENTIALS (Risk) - ATR
         # Manually assign to match old naming convention
@@ -148,50 +149,65 @@ class Strategy:
         df[f"ATRr_{p['ATR_PERIOD']}"] = atr_obj.average_true_range()
 
         # 2. TREND
-        if "EMA_CROSS" in recipe:
+        if "EMA" in recipe:
             df[f"EMA_{p['EMA_FAST']}"] = ta.trend.EMAIndicator(close=df['close'], window=p['EMA_FAST']).ema_indicator()
             df[f"EMA_{p['EMA_SLOW']}"] = ta.trend.EMAIndicator(close=df['close'], window=p['EMA_SLOW']).ema_indicator()
+        
+        if "SMA" in recipe:
+            df[f"SMA_{p['SMA_PERIOD']}"] = ta.trend.SMAIndicator(close=df['close'], window=p['SMA_PERIOD']).sma_indicator()
             
-        if "SAR_REVERSAL" in recipe:
+        if "SAR" in recipe:
             # 'ta' gives PSAR values directly
             df['PSAR'] = ta.trend.PSARIndicator(high=df['high'], low=df['low'], close=df['close']).psar()
             
-        if "ICHIMOKU_CLOUD" in recipe:
+        if "Ichi" in recipe:
             ichi = ta.trend.IchimokuIndicator(high=df['high'], low=df['low'])
             df['ISA_9'] = ichi.ichimoku_a()
             df['ISB_26'] = ichi.ichimoku_b()
             
-        if "DONCHIAN_BREAKOUT" in recipe:
+        if "Donch" in recipe:
             dc = ta.volatility.DonchianChannel(high=df['high'], low=df['low'], close=df['close'], window=p['DONCHIAN_PERIOD'])
             df[f"DCU_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"] = dc.donchian_channel_hband()
             df[f"DCL_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"] = dc.donchian_channel_lband()
             
-        if "ADX_FILTER" in recipe:
+        if "ADX" in recipe:
             df['ADX_14'] = ta.trend.ADXIndicator(high=df['high'], low=df['low'], close=df['close'], window=14).adx()
+            
+        if "TRIX" in recipe:
+            df[f"TRIX_{p['TRIX_PERIOD']}"] = ta.trend.TRIXIndicator(close=df['close'], window=p['TRIX_PERIOD']).trix()
 
         # 3. MOMENTUM
-        if "RSI_FILTER" in recipe:
+        if "RSI" in recipe:
             df[f"RSI_{p['RSI_PERIOD']}"] = ta.momentum.RSIIndicator(close=df['close'], window=p['RSI_PERIOD']).rsi()
             
-        if "MACD_CONFIRM" in recipe:
+        if "MACD" in recipe:
             macd = ta.trend.MACD(close=df['close'])
             df['MACD_12_26_9'] = macd.macd() # Standard MACD line
             
-        if "STOCH_ENTRY" in recipe:
+        if "Stoch" in recipe:
             stoch = ta.momentum.StochasticOscillator(high=df['high'], low=df['low'], close=df['close'])
             df['STOCHk_14_3_3'] = stoch.stoch()
             df['STOCHd_14_3_3'] = stoch.stoch_signal()
             
-        if "CCI_MOMENTUM" in recipe:
+        if "CCI" in recipe:
             df['CCI_14_0.015'] = ta.trend.CCIIndicator(high=df['high'], low=df['low'], close=df['close']).cci()
+            
+        if "WillR" in recipe:
+            df[f"WILLR_{p['WILLIAMS_PERIOD']}"] = ta.momentum.WilliamsRIndicator(high=df['high'], low=df['low'], close=df['close'], lbp=p['WILLIAMS_PERIOD']).williams_r()
+            
+        if "ROC" in recipe:
+            df[f"ROC_{p['ROC_PERIOD']}"] = ta.momentum.ROCIndicator(close=df['close'], window=p['ROC_PERIOD']).roc()
+            
+        if "MFI" in recipe and volume_col is not None:
+            df[f"MFI_{p['MFI_PERIOD']}"] = ta.volume.MFIIndicator(high=df['high'], low=df['low'], close=df['close'], volume=volume_col, window=p['MFI_PERIOD']).money_flow_index()
 
         # 4. VOLATILITY
-        if "BOLLINGER_SQUEEZE" in recipe:
+        if "Bol" in recipe:
             bb = ta.volatility.BollingerBands(close=df['close'])
             df['BBU_5_2.0'] = bb.bollinger_hband()
             df['BBL_5_2.0'] = bb.bollinger_lband()
             
-        if "KELTNER_CHANNEL" in recipe:
+        if "Kelt" in recipe:
             # Manual Keltner Calculation (EMA +/- ATR * Mult)
             kc_ema = ta.trend.EMAIndicator(close=df['close'], window=20).ema_indicator()
             kc_atr = ta.volatility.AverageTrueRange(high=df['high'], low=df['low'], close=df['close'], window=10).average_true_range()
@@ -218,58 +234,87 @@ class Strategy:
         sell_vote = True
         
         # --- TREND LOGIC ---
-        if "EMA_CROSS" in recipe:
+        if "EMA" in recipe:
             fast, slow = curr[f"EMA_{p['EMA_FAST']}"], curr[f"EMA_{p['EMA_SLOW']}"]
             if not (fast > slow): buy_vote = False
             if not (fast < slow): sell_vote = False
+            
+        if "SMA" in recipe:
+            # Simple Logic: Price > SMA 200 = Bullish
+            sma = curr[f"SMA_{p['SMA_PERIOD']}"]
+            if curr['close'] < sma: buy_vote = False
+            if curr['close'] > sma: sell_vote = False
+            
+        if "TRIX" in recipe:
+            # TRIX > 0 Bullish, TRIX < 0 Bearish
+            trix = curr[f"TRIX_{p['TRIX_PERIOD']}"]
+            if trix < 0: buy_vote = False
+            if trix > 0: sell_vote = False
 
-        if "SAR_REVERSAL" in recipe:
+        if "SAR" in recipe:
             # Logic: Close > PSAR = Bull
             psar_val = curr['PSAR']
             if curr['close'] < psar_val: buy_vote = False
             if curr['close'] > psar_val: sell_vote = False
 
-        if "ICHIMOKU_CLOUD" in recipe:
+        if "Ichi" in recipe:
             span_a = curr['ISA_9']
             span_b = curr['ISB_26']
             if not (curr['close'] > max(span_a, span_b)): buy_vote = False # Above Cloud
             if not (curr['close'] < min(span_a, span_b)): sell_vote = False # Below Cloud
 
-        if "DONCHIAN_BREAKOUT" in recipe:
+        if "Donch" in recipe:
             upper = prev[f"DCU_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"]
             lower = prev[f"DCL_{p['DONCHIAN_PERIOD']}_{p['DONCHIAN_PERIOD']}"]
             if not (curr['close'] > upper): buy_vote = False
             if not (curr['close'] < lower): sell_vote = False
 
         # --- MOMENTUM LOGIC ---
-        if "RSI_FILTER" in recipe:
+        if "RSI" in recipe:
             rsi = curr[f"RSI_{p['RSI_PERIOD']}"]
             if rsi > p['RSI_LIMIT_HIGH']: buy_vote = False
             if rsi < p['RSI_LIMIT_LOW']: sell_vote = False
+            
+        if "WillR" in recipe:
+            # Range is -100 to 0. > -50 is Bullish momentum.
+            wr = curr[f"WILLR_{p['WILLIAMS_PERIOD']}"]
+            if wr < -50: buy_vote = False
+            if wr > -50: sell_vote = False
+            
+        if "MFI" in recipe and f"MFI_{p['MFI_PERIOD']}" in df.columns:
+            mfi = curr[f"MFI_{p['MFI_PERIOD']}"]
+            # > 50 Bullish
+            if mfi < 50: buy_vote = False
+            if mfi > 50: sell_vote = False
+            
+        if "ROC" in recipe:
+            roc = curr[f"ROC_{p['ROC_PERIOD']}"]
+            if roc < 0: buy_vote = False
+            if roc > 0: sell_vote = False
 
-        if "CCI_MOMENTUM" in recipe:
+        if "CCI" in recipe:
             cci = curr['CCI_14_0.015']
             if cci < 100: buy_vote = False
             if cci > -100: sell_vote = False
 
-        if "STOCH_ENTRY" in recipe:
+        if "Stoch" in recipe:
             k, d = curr['STOCHk_14_3_3'], curr['STOCHd_14_3_3']
             if not (k < 20 and k > d): buy_vote = False 
             if not (k > 80 and k < d): sell_vote = False
 
         # --- VOLATILITY LOGIC ---
-        if "KELTNER_CHANNEL" in recipe:
+        if "Kelt" in recipe:
             upper = curr[f"KCUe_20_{p['KELTNER_MULT']}"]
             lower = curr[f"KCLe_20_{p['KELTNER_MULT']}"]
             if curr['close'] < upper: buy_vote = False
             if curr['close'] > lower: sell_vote = False
 
-        if "ADX_FILTER" in recipe:
+        if "ADX" in recipe:
             if curr['ADX_14'] < p['ADX_THRESHOLD']:
                 buy_vote = False; sell_vote = False
 
         # --- EXOTIC LOGIC ---
-        if "FIB_GOLDEN_ZONE" in recipe:
+        if "Fib" in recipe:
             lb = p['FIB_LOOKBACK']
             high = df['high'].rolling(lb).max().iloc[-1]
             low = df['low'].rolling(lb).min().iloc[-1]
@@ -287,12 +332,12 @@ class Strategy:
             sl_dist = atr * p['ATR_MULTIPLIER']
             sl = curr['close'] - sl_dist
             tp = curr['close'] + (sl_dist * p['RISK_REWARD'])
-            return 'BUY', sl, tp, f"Darwin_{self.state['VERSION']}"
+            return 'BUY', sl, tp, self.name
 
         elif sell_vote and not buy_vote:
             sl_dist = atr * p['ATR_MULTIPLIER']
             sl = curr['close'] + sl_dist
             tp = curr['close'] - (sl_dist * p['RISK_REWARD'])
-            return 'SELL', sl, tp, f"Darwin_{self.state['VERSION']}"
+            return 'SELL', sl, tp, self.name
 
         return None, None, None, None

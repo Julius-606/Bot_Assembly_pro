@@ -3,7 +3,7 @@ import os
 import subprocess
 import MetaTrader5 as mt5
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import MT5_PATH, MT5_LOGIN, MT5_PASSWORD, MT5_SERVER, FIXED_LOT_SIZE
 
 class BrokerAPI:
@@ -168,6 +168,10 @@ class BrokerAPI:
         # 🛠️ GET CORRECT FILLING MODE
         fill_mode = self.get_filling_mode(symbol)
 
+        # 🛡️ TRUNCATE COMMENT TO 30 CHARS (MT5 LIMIT IS 31, BUT SAFETY FIRST)
+        # Ensure it's a string to prevent TypeErrors
+        safe_comment = str(comment)[:30]
+
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
@@ -178,12 +182,18 @@ class BrokerAPI:
             "tp": float(tp),
             "deviation": 20,
             "magic": 234000,
-            "comment": comment,
+            "comment": safe_comment, # Use the safe version
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": fill_mode, 
         }
         
         result = mt5.order_send(request)
+        
+        # 🛡️ THE FIX: Check res validity
+        if result is None:
+            print(f"   ❌ Trade Failed: OrderSend returned None (MT5 Error: {mt5.last_error()})")
+            return None
+            
         if result.retcode != mt5.TRADE_RETCODE_DONE:
             print(f"   ❌ Trade Failed: {result.comment} (Retcode: {result.retcode})")
             return None
@@ -223,11 +233,27 @@ class BrokerAPI:
             if history:
                 total_profit = sum([d.profit + d.swap + d.commission for d in history])
                 last_deal = history[-1]
+                
+                # 🕵️ DECIPHER CLOSE REASON
+                reason_code = last_deal.reason
+                reason_str = "CLOSED_BY_BROKER" # Default fallback
+                
+                if reason_code == mt5.DEAL_REASON_SL: reason_str = "SL_HIT"
+                elif reason_code == mt5.DEAL_REASON_TP: reason_str = "TP_HIT"
+                elif reason_code == mt5.DEAL_REASON_CLIENT: reason_str = "MANUAL_CLOSE"
+                elif reason_code == mt5.DEAL_REASON_EXPERT: reason_str = "BOT_CLOSE"
+                elif reason_code == mt5.DEAL_REASON_SO: reason_str = "STOP_OUT"
+                
+                # ⏰ TIMEZONE FIX: Subtract 2 hours from MT5 Server Time
+                exit_time_obj = datetime.fromtimestamp(last_deal.time)
+                exit_time_obj = exit_time_obj - timedelta(hours=2) # Adjusting for SAST/Local vs Server
+
                 return {
                     'status': 'closed',
                     'pnl': round(total_profit, 2),
                     'exit_price': last_deal.price,
-                    'close_time': datetime.fromtimestamp(last_deal.time).strftime("%Y-%m-%d %H:%M:%S")
+                    'close_time': exit_time_obj.strftime("%Y-%m-%d %H:%M:%S"), # Use adjusted time
+                    'reason': reason_str # 🚀 Sending the real reason back!
                 }
         except:
             pass
