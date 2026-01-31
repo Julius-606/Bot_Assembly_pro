@@ -1,54 +1,52 @@
 import streamlit as st
 from datetime import datetime, timedelta
-from src.backtester import BacktestEngine
+from src.cloud import CloudManager
 from config import USER_DEFAULT_MARKETS
 
-st.set_page_config(page_title="Darwin Backtest Lab 🧪", layout="wide")
+st.set_page_config(page_title="The Concoction Lab Cloud 🛰️", layout="wide")
 
-st.title("🧬 Darwin Concoction Lab")
-st.write("Modular Backtester: Testing parameters before going live.")
+st.title("🛰️ The Concoction Lab (Cloud Edition)")
+st.write("Commander, pick your settings. The local VM will handle the heavy lifting. No cap.")
 
-# Init the Engine
-if 'engine' not in st.session_state:
-    st.session_state.engine = BacktestEngine()
+cloud = CloudManager()
 
-# --- CALIBRATION SIDEBAR ---
+# --- SIDEBAR: The Calibration Station ---
 with st.sidebar:
-    st.header("⚙️ Calibrations")
-    
-    selected_pairs = st.multiselect("Pairs to Run", USER_DEFAULT_MARKETS, default=["EURUSD", "GBPUSD"])
-    tf = st.selectbox("Timeframe", ["M5", "M15", "H1", "H4", "D1"], index=1)
+    st.header("⚙️ Mission Settings")
+    pairs = st.multiselect("Select Pairs", USER_DEFAULT_MARKETS, default=["EURUSD", "GBPUSD"])
+    tf = st.selectbox("Timeframe", ["M1", "M5", "M15", "H1", "H4", "D1"], index=2)
     
     col1, col2 = st.columns(2)
     with col1:
-        start = st.date_input("Start Date", datetime.now() - timedelta(days=30))
+        start_date = st.date_input("Start", datetime.now() - timedelta(days=30))
     with col2:
-        end = st.date_input("End Date", datetime.now())
-        
-    st.divider()
+        end_date = st.date_input("End", datetime.now())
     
-    st.write("🍱 **The Pantry**")
-    menu = ["EMA", "RSI", "MACD", "Bol", "ADX", "SAR", "Ichi", "Donch", "Stoch", "WillR"]
-    recipe = st.multiselect("Concoction Ingredients", menu, default=["EMA", "RSI", "ADX"])
+    st.divider()
+    st.write("⚖️ **Strictness Level**")
+    strictness = st.select_slider("Confluence Needed", options=["Low", "Medium", "High"], value="Medium")
+    
+    st.divider()
+    st.write("🧬 **Recipe**")
+    menu = ["EMA", "RSI", "MACD", "Bol", "ADX", "SAR", "Ichi", "Kelt", "Donch", "Stoch", "CCI", "SMA", "WillR", "MFI", "ROC", "TRIX"]
+    concoction = st.multiselect("Ingredients", menu, default=["EMA", "MACD", "Bol"])
 
-# --- MAIN SHOW ---
-if st.button("🚀 RUN BACKTEST SHOW"):
-    success, msg = st.session_state.engine.startup()
-    if not success:
-        st.error(msg)
+# --- MAIN: Mission Control ---
+if st.button("🚀 DEPLOY MISSION TO VM"):
+    if not pairs:
+        st.error("Pick at least one pair, chief.")
     else:
-        st.toast("MT5 Connected. Time traveling...", icon="🕰️")
-        
-        for pair in selected_pairs:
-            st.subheader(f"📊 Testing {pair}")
-            prog = st.progress(0)
-            status = st.empty()
-            
-            s_dt = datetime.combine(start, datetime.min.time())
-            e_dt = datetime.combine(end, datetime.max.time())
-            
-            result = st.session_state.engine.run_concoction_test(pair, tf, s_dt, e_dt, recipe, prog)
-            status.write(result)
-            
-        st.success("Test Show Finished. Check Google Sheets! 📈")
-        st.session_state.engine.shutdown()
+        success = cloud.request_task(
+            pairs, tf, concoction, strictness, 
+            start_date.strftime("%Y-%m-%d"), 
+            end_date.strftime("%Y-%m-%d")
+        )
+        if success:
+            st.success("🛰️ Mission Sent! The VM is firing up. Check your 'Tasks' sheet to watch the progress.")
+            st.balloons()
+        else:
+            st.error("❌ Failed to contact the C2 Center.")
+
+st.divider()
+st.subheader("📋 Recent Tasks")
+# You could add a 'cloud.get_all_tasks()' logic here to display a table of what's happening
