@@ -41,11 +41,16 @@ from datetime import datetime
 
 
 
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
 STRATEGY_STATE = {
-    "VERSION": "3.2",
+    "VERSION": "3.3",
     "MENU": [
         "EMA",
         "RSI",
@@ -67,19 +72,19 @@ STRATEGY_STATE = {
     ],
     "ACTIVE_CONCOCTION": [
         "EMA",
-        "ADX",
-        "CCI"
+        "MACD",
+        "Stoch"
     ],
     "PARAMS": {
         "EMA_FAST": 10,
-        "EMA_SLOW": 21,
+        "EMA_SLOW": 20,
         "RSI_PERIOD": 14,
         "RSI_LIMIT_LOW": 30,
         "RSI_LIMIT_HIGH": 70,
         "ATR_PERIOD": 14,
         "ATR_MULTIPLIER": 3.0,
         "RISK_REWARD": 2.0,
-        "ADX_THRESHOLD": 35,
+        "ADX_THRESHOLD": 25,
         "DONCHIAN_PERIOD": 30,
         "KELTNER_MULT": 2.0,
         "FIB_LOOKBACK": 100,
@@ -87,10 +92,18 @@ STRATEGY_STATE = {
         "WILLIAMS_PERIOD": 14,
         "MFI_PERIOD": 14,
         "ROC_PERIOD": 12,
-        "TRIX_PERIOD": 15
+        "TRIX_PERIOD": 15,
+        "MACD_FAST_PERIOD": 12,
+        "MACD_SLOW_PERIOD": 26,
+        "MACD_SIGNAL_PERIOD": 9,
+        "STOCH_K_PERIOD": 14,
+        "STOCH_D_PERIOD": 3,
+        "STOCH_SMOOTHING": 3,
+        "STOCH_LIMIT_LOW": 20,
+        "STOCH_LIMIT_HIGH": 80
     },
     "BENCHED_PAIRS": {
-        "EURAUD": "2026-01-30 05:29:41"
+        "EURAUD": "2026-01-30 17:06:37"
     },
     "MODE": "STANDARD"
 }

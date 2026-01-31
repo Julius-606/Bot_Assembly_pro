@@ -54,11 +54,18 @@ from datetime import datetime
 
 
 
+
+
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
 STRATEGY_STATE = {
-    "VERSION": "3.3",
+    "VERSION": "3.4",
     "MENU": [
         "EMA",
         "RSI",
@@ -79,9 +86,9 @@ STRATEGY_STATE = {
         "TRIX"
     ],
     "ACTIVE_CONCOCTION": [
-        "EMA",
-        "MACD",
-        "Bol"
+        "Donch",
+        "WillR",
+        "ADX"
     ],
     "PARAMS": {
         "EMA_FAST": 20,
@@ -91,22 +98,23 @@ STRATEGY_STATE = {
         "RSI_LIMIT_HIGH": 70,
         "ATR_PERIOD": 20,
         "ATR_MULTIPLIER": 3.0,
-        "RISK_REWARD": 1.2,
-        "ADX_THRESHOLD": 35,
-        "DONCHIAN_PERIOD": 30,
+        "RISK_REWARD": 2.0,
+        "ADX_THRESHOLD": 30,
+        "DONCHIAN_PERIOD": 40,
         "KELTNER_MULT": 2.0,
         "FIB_LOOKBACK": 100,
-        "SMA_PERIOD": 200,
+        "SMA_PERIOD": 50,
         "WILLIAMS_PERIOD": 14,
         "MFI_PERIOD": 14,
         "ROC_PERIOD": 12,
         "TRIX_PERIOD": 15
     },
     "BENCHED_PAIRS": {
-        "NZDJPY": "2026-01-30 08:34:09",
-        "EURCAD": "2026-01-30 08:34:09",
-        "EURJPY": "2026-01-30 08:34:09",
-        "CHFJPY": "2026-01-30 08:34:09"
+        "NZDJPY": "2026-01-30 19:56:11",
+        "GBPAUD": "2026-01-30 19:56:11",
+        "EURCAD": "2026-01-30 19:56:11",
+        "EURJPY": "2026-01-30 19:56:11",
+        "CHFJPY": "2026-01-30 19:56:11"
     },
     "MODE": "STANDARD"
 }

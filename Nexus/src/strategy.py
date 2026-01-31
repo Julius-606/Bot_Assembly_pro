@@ -19,6 +19,10 @@ from datetime import datetime
 
 
 
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -28,7 +32,6 @@ STRATEGY_STATE = {
         "EMA",
         "RSI",
         "MACD",
-        "Bol",
         "ADX",
         "SAR",
         "Ichi",
@@ -44,27 +47,33 @@ STRATEGY_STATE = {
         "TRIX"
     ],
     "ACTIVE_CONCOCTION": [
-        "Bol",
-        "RSI",
-        "MACD"
+        "EMA",
+        "MACD",
+        "ADX"
     ],
     "PARAMS": {
-        "BOL_PERIOD": 20,
-        "BOL_DEVIATIONS": 2.0,
-        "RSI_PERIOD": 21,
+        "EMA_FAST": 14,
+        "EMA_SLOW": 34,
+        "RSI_PERIOD": 14,
         "RSI_LIMIT_LOW": 30,
         "RSI_LIMIT_HIGH": 70,
-        "MACD_FAST_PERIOD": 12,
-        "MACD_SLOW_PERIOD": 26,
-        "MACD_SIGNAL_PERIOD": 9,
         "ATR_PERIOD": 14,
-        "ATR_MULTIPLIER": 3.0,
-        "RISK_REWARD": 2.0
+        "ATR_MULTIPLIER": 3.5,
+        "RISK_REWARD": 2.0,
+        "ADX_THRESHOLD": 30,
+        "DONCHIAN_PERIOD": 30,
+        "KELTNER_MULT": 2.0,
+        "FIB_LOOKBACK": 100,
+        "SMA_PERIOD": 200,
+        "WILLIAMS_PERIOD": 14,
+        "MFI_PERIOD": 14,
+        "ROC_PERIOD": 12,
+        "TRIX_PERIOD": 15
     },
     "BENCHED_PAIRS": {
-        "NZDUSD": "2026-01-30 06:23:16",
-        "AUDNZD": "2026-01-30 06:23:16",
-        "EURGBP": "2026-01-30 06:23:16"
+        "NZDUSD": "2026-01-30 21:35:26",
+        "AUDNZD": "2026-01-30 21:35:26",
+        "EURGBP": "2026-01-30 21:35:26"
     },
     "MODE": "STANDARD"
 }

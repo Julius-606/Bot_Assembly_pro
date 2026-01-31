@@ -6,6 +6,7 @@ python-telegram-bot
 gspread
 google-api-python-client
 google-auth
+streamlit
 requests
 google-generativeai 
 python-dotenv
