@@ -1,20 +1,22 @@
 import os
-import sys
 import json
 import streamlit as st
 from dotenv import load_dotenv
 
-# 🔐 LOAD SECRETS
-# Locally, it uses .env. In the cloud, it checks st.secrets automatically.
+# 🔐 THE HYBRID LOADER
+# Sniffs for .env locally. Streamlit Cloud ignores this and uses its own Secrets.
 load_dotenv(override=True)
 
 def get_secret(key, default=None):
-    """Hybrid secret getter: Checks Streamlit Secrets first, then ENV."""
+    """Hybrid getter: Checks Streamlit Secrets first (Cloud), then Environment (Local)."""
     try:
+        # Check Streamlit's internal secrets first
         if key in st.secrets:
             return st.secrets[key]
     except:
         pass
+    
+    # Fallback to standard environment variables
     return os.getenv(key, default)
 
 # ==============================================================================
@@ -34,24 +36,24 @@ SHEET_URL = get_secret("GOOGLE_SHEET_URL")
 HARDCODED_LOT_SIZE = 0.01
 CONTRACT_SIZE = 100000 
 
-google_json_str = get_secret("GOOGLE_CREDS")
+# --- GOOGLE CREDS LOGIC (The Alpha Logic) ---
+raw_creds = get_secret("GOOGLE_CREDS")
 
-if google_json_str:
-    try:
-        # Clean up any weird quotes from the dashboard paste
-        clean_json = str(google_json_str).strip().strip("'").strip('"')
-        creds_dict = json.loads(clean_json)
-        
-        if "private_key" in creds_dict:
-            raw_key = creds_dict["private_key"]
-            # Fix newline escaping which often breaks in JSON strings
-            formatted_key = raw_key.replace("\\n", "\n")
-            creds_dict["private_key"] = formatted_key
-            
-        GOOGLE_CREDS_DICT = creds_dict
-    except json.JSONDecodeError as e:
-        print(f"⚠️ CONFIG ERROR: GOOGLE_CREDS is not valid JSON.\n{e}")
-        GOOGLE_CREDS_DICT = {}
+if raw_creds:
+    # Handle both Dict (Streamlit TOML) and String (Local .env)
+    if isinstance(raw_creds, dict):
+        GOOGLE_CREDS_DICT = dict(raw_creds)
+    else:
+        try:
+            clean_json = str(raw_creds).strip().strip("'").strip('"')
+            GOOGLE_CREDS_DICT = json.loads(clean_json)
+        except Exception as e:
+            print(f"⚠️ CONFIG ERROR: GOOGLE_CREDS string parse failed: {e}")
+            GOOGLE_CREDS_DICT = {}
+    
+    # Fix the private_key formatting if it contains escaped newlines
+    if "private_key" in GOOGLE_CREDS_DICT:
+        GOOGLE_CREDS_DICT["private_key"] = GOOGLE_CREDS_DICT["private_key"].replace("\\n", "\n")
 else:
     print("⚠️ CONFIG ERROR: GOOGLE_CREDS not found in Secrets or .env")
     GOOGLE_CREDS_DICT = {}
