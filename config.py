@@ -59,9 +59,16 @@ if raw_creds:
         except Exception as e:
             print(f"⚠️ CONFIG ERROR: GOOGLE_CREDS string parse failed: {e}")
     
-    # Fix the private_key formatting if it contains escaped newlines
+    # 🔥 THE NUCLEAR PEM FIX
     if "private_key" in GOOGLE_CREDS_DICT:
-        GOOGLE_CREDS_DICT["private_key"] = GOOGLE_CREDS_DICT["private_key"].replace("\\n", "\n")
+        pk = GOOGLE_CREDS_DICT["private_key"]
+        # Convert literal \n strings to actual newlines
+        pk = pk.replace("\\n", "\n")
+        
+        # Clean up any weird indentations/spaces on each line that break Base64 math
+        # PEM format is very picky about leading/trailing spaces on the 64-char lines
+        lines = [line.strip() for line in pk.split("\n") if line.strip()]
+        GOOGLE_CREDS_DICT["private_key"] = "\n".join(lines)
 else:
     print("⚠️ CONFIG ERROR: GOOGLE_CREDS not found in Secrets or .env")
 
