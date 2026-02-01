@@ -1,15 +1,13 @@
-# The fuel for the rocket 🚀
+pandas==2.2.0
+streamlit==1.31.0
+gspread==6.0.0
+google-auth==2.27.0
+ta==0.11.0
+python-dotenv==1.0.1
+numpy==1.26.4
+requests==2.31.0
 MetaTrader5
-pandas
-numpy
 python-telegram-bot
-gspread
 google-api-python-client
-google-auth
-streamlit
-requests
 google-generativeai 
-python-dotenv
 dotenv
-pandas
-ta
