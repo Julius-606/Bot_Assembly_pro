@@ -6,8 +6,8 @@ ta==0.11.0
 python-dotenv==1.0.1
 numpy==1.26.4
 requests==2.31.0
-MetaTrader5
 python-telegram-bot
 google-api-python-client
 google-generativeai 
 dotenv
+#MetaTrader5==5.0.38
