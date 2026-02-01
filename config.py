@@ -3,7 +3,7 @@ import json
 import streamlit as st
 from dotenv import load_dotenv
 
-# 🔐 THE HYBRID LOADER
+# 🔐 THE HYBRID LOADER (The Safe Way)
 # Sniffs for .env locally. Streamlit Cloud ignores this and uses its own Secrets.
 load_dotenv(override=True)
 
@@ -45,6 +45,7 @@ if raw_creds:
         GOOGLE_CREDS_DICT = dict(raw_creds)
     else:
         try:
+            # Clean up potential string formatting issues from .env
             clean_json = str(raw_creds).strip().strip("'").strip('"')
             GOOGLE_CREDS_DICT = json.loads(clean_json)
         except Exception as e:
