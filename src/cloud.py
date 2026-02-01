@@ -8,12 +8,13 @@ class CloudManager:
     def __init__(self):
         self.client = None
         self.authenticated = False
+        self.last_error = ""
         self.setup()
 
     def setup(self):
         """Initializes the link to the Motherboard."""
         if not GOOGLE_CREDS_DICT or "client_email" not in GOOGLE_CREDS_DICT:
-            print("⚠️ Cloud Manager standing by: Missing Credentials in config.")
+            self.last_error = "Missing GOOGLE_CREDS in configuration."
             return
             
         try:
@@ -25,12 +26,11 @@ class CloudManager:
                 ]
             )
             self.client = gspread.authorize(creds)
-            # Try a test connection to verify auth immediately
+            # Test the link immediately to ensure we aren't ghosted
             self.client.open_by_url(SHEET_URL)
             self.authenticated = True
-            print("🛰️ Cloud C2 Link Established. We are SO back.")
         except Exception as e:
-            print(f"❌ Cloud Setup Failed: {e}")
+            self.last_error = str(e)
             self.authenticated = False
 
     def _set_dropdown_request(self, sheet_id, start_row, end_row, start_col, end_col, options):
@@ -56,17 +56,15 @@ class CloudManager:
 
     # --- 🛰️ MISSION CONTROL (Streamlit Side) ---
     def request_task(self, pairs, tf, recipe, strictness, start_date, end_date):
-        """Drops a mission into the 'Tasks' sheet for the local worker to grab."""
+        """Drops a mission into the 'Tasks' sheet. Returns (Success, ErrorMsg)."""
         if not self.authenticated: 
-            print("❌ Cannot request task: CloudManager not authenticated.")
-            return False
+            return False, f"Not authenticated: {self.last_error}"
             
         try:
             sheet = self.client.open_by_url(SHEET_URL)
             try:
                 ws = sheet.worksheet("Tasks")
-            except Exception:
-                # If Tasks doesn't exist, create it with headers
+            except:
                 ws = sheet.add_worksheet(title="Tasks", rows="1000", cols="10")
                 ws.append_row(["Timestamp", "Status", "Pairs", "TF", "Recipe", "Strictness", "Start", "End"])
             
@@ -80,13 +78,9 @@ class CloudManager:
                 start_date,
                 end_date
             ])
-            return True
+            return True, ""
         except Exception as e:
-            # This will show up in your Streamlit/Worker logs
-            print(f"❌ Mission Request Error: {e}")
-            if "PERMISSION_DENIED" in str(e):
-                print("💡 Pro Tip: Did you share the sheet with your service account email?")
-            return False
+            return False, str(e)
 
     # --- 🚜 GROUND WORKER LOGIC (Worker Side) ---
     def get_pending_tasks(self):
@@ -97,9 +91,7 @@ class CloudManager:
             ws = sheet.worksheet("Tasks")
             all_tasks = ws.get_all_records()
             return [(idx + 2, task) for idx, task in enumerate(all_tasks) if task.get('Status') == 'PENDING']
-        except Exception as e:
-            print(f"⚠️ Worker polling error: {e}")
-            return []
+        except: return []
 
     def update_task_status(self, row_idx, status):
         """Worker updates the status (RUNNING, COMPLETED, ERROR)."""
@@ -108,11 +100,11 @@ class CloudManager:
             sheet = self.client.open_by_url(SHEET_URL)
             ws = sheet.worksheet("Tasks")
             ws.update_cell(row_idx, 2, status)
-        except Exception as e: 
-            print(f"⚠️ Status update failed: {e}")
+        except: pass
 
-    # --- 📊 TACTICAL LOGGING (The Sauce) ---
+    # --- 📊 TACTICAL LOGGING (The Alpha Logic) ---
     def get_next_batch_id(self):
+        """Sniffs out the next ID and ensures the 'Batches' tab is aesthetic."""
         if not self.authenticated: return 1
         try:
             sheet = self.client.open_by_url(SHEET_URL)
@@ -122,7 +114,11 @@ class CloudManager:
                 ws = sheet.add_worksheet(title="Batches", rows="1000", cols="10")
                 headers = ["Batch no.", "Date Range", "Selected Pairs", "TimeFrame", "Strategy", "Strictness", "Trade count", "Batch PnL", "Profit Factor", "% Win Rate"]
                 ws.append_row(headers)
-                ws.format('A1:J1', {'textFormat': {'bold': True, 'foregroundColor': {'red': 1.0, 'green': 1.0, 'blue': 1.0}}, 'backgroundColor': {'red': 0.1, 'green': 0.35, 'blue': 0.25}, 'horizontalAlignment': 'CENTER'})
+                ws.format('A1:J1', {
+                    'textFormat': {'bold': True, 'foregroundColor': {'red': 1.0, 'green': 1.0, 'blue': 1.0}},
+                    'backgroundColor': {'red': 0.1, 'green': 0.35, 'blue': 0.25},
+                    'horizontalAlignment': 'CENTER'
+                })
                 ws.freeze(rows=1)
                 return 1
             ids = ws.col_values(1)
@@ -130,21 +126,24 @@ class CloudManager:
         except: return 1
 
     def log_batch_meta(self, data):
-        """Logs the strategy setup into the master 'Batches' sheet."""
+        """Logs the strategy setup and adds interactive dropdowns."""
         if not self.authenticated: return
         try:
             sheet = self.client.open_by_url(SHEET_URL)
             ws = sheet.worksheet("Batches")
             ws.append_row(data)
             row_idx = len(ws.get_all_values())
-            ws.format(f'A{row_idx}:J{row_idx}', {'borders': {'top': {'style': 'SOLID'}, 'bottom': {'style': 'SOLID'}, 'left': {'style': 'SOLID'}, 'right': {'style': 'SOLID'}}, 'horizontalAlignment': 'CENTER'})
-            # Add dropdown for strictness
+            ws.format(f'A{row_idx}:J{row_idx}', {
+                'borders': {'top': {'style': 'SOLID'}, 'bottom': {'style': 'SOLID'}, 'left': {'style': 'SOLID'}, 'right': {'style': 'SOLID'}},
+                'horizontalAlignment': 'CENTER'
+            })
+            # Add interactive dropdown for strictness just in case you want to tweak it manually later
             requests = [self._set_dropdown_request(ws.id, row_idx - 1, row_idx, 5, 6, ['Low', 'Medium', 'High'])]
             sheet.batch_update({"requests": requests})
         except Exception as e: print(f"❌ Batch Meta Error: {e}")
 
     def create_batch_sheet(self, batch_id):
-        """Creates a dedicated tab for the individual trades of a mission."""
+        """Creates a dedicated tab for the individual trades with conditional formatting."""
         if not self.authenticated: return
         try:
             sheet = self.client.open_by_url(SHEET_URL)
@@ -154,18 +153,43 @@ class CloudManager:
                 ws = sheet.add_worksheet(title=name, rows="1000", cols="16")
                 ws.append_row(["Batch ID", "Strategy", "Pair", "Signal", "Time Open", "Entry Point", "SL Price", "SL Money", "Lot size", "Spreads", "TP Money", "TP Price", "Exit Point", "Time Closed", "PnL", "Close Reason"])
                 ws.freeze(rows=1)
-                ws.format('A1:P1', {'textFormat': {'bold': True, 'foregroundColor': {'red': 1.0, 'green': 1.0, 'blue': 1.0}}, 'backgroundColor': {'red': 0.1, 'green': 0.35, 'blue': 0.25}})
+                ws.format('A1:P1', {
+                    'textFormat': {'bold': True, 'foregroundColor': {'red': 1.0, 'green': 1.0, 'blue': 1.0}},
+                    'backgroundColor': {'red': 0.1, 'green': 0.35, 'blue': 0.25}
+                })
                 
-                # Dynamic Green/Red formatting for PnL column (O)
+                # Dynamic Green/Red formatting for PnL column (O) - Visual Alpha!
                 requests = [
-                    {"addConditionalFormatRule": {"rule": {"ranges": [{"sheetId": ws.id, "startRowIndex": 1, "endRowIndex": 1000, "startColumnIndex": 14, "endColumnIndex": 15}], "booleanRule": {"condition": {"type": "NUMBER_GREATER", "values": [{"userEnteredValue": "0"}]}, "format": {"backgroundColor": {"green": 0.8, "red": 0.4, "blue": 0.4}}}}, "index": 0}},
-                    {"addConditionalFormatRule": {"rule": {"ranges": [{"sheetId": ws.id, "startRowIndex": 1, "endRowIndex": 1000, "startColumnIndex": 14, "endColumnIndex": 15}], "booleanRule": {"condition": {"type": "NUMBER_LESS", "values": [{"userEnteredValue": "0"}]}, "format": {"backgroundColor": {"red": 0.8, "green": 0.4, "blue": 0.4}}}}, "index": 1}}
+                    {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{"sheetId": ws.id, "startRowIndex": 1, "endRowIndex": 1000, "startColumnIndex": 14, "endColumnIndex": 15}],
+                                "booleanRule": {
+                                    "condition": {"type": "NUMBER_GREATER", "values": [{"userEnteredValue": "0"}]},
+                                    "format": {"backgroundColor": {"green": 0.8, "red": 0.4, "blue": 0.4}}
+                                }
+                            },
+                            "index": 0
+                        }
+                    },
+                    {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{"sheetId": ws.id, "startRowIndex": 1, "endRowIndex": 1000, "startColumnIndex": 14, "endColumnIndex": 15}],
+                                "booleanRule": {
+                                    "condition": {"type": "NUMBER_LESS", "values": [{"userEnteredValue": "0"}]},
+                                    "format": {"backgroundColor": {"red": 0.8, "green": 0.4, "blue": 0.4}}
+                                }
+                            },
+                            "index": 1
+                        }
+                    }
                 ]
                 sheet.batch_update({"requests": requests})
         except Exception as e: print(f"❌ Create Sheet Error: {e}")
 
     def log_batch_results(self, batch_id, data):
-        """Streams trade results into the batch tab."""
+        """Streams trade results into the batch tab with clean borders."""
         if not self.authenticated: return
         try:
             sheet = self.client.open_by_url(SHEET_URL)
@@ -173,11 +197,13 @@ class CloudManager:
             start_row = len(ws.get_all_values()) + 1
             ws.append_rows(data)
             end_row = start_row + len(data) - 1
-            ws.format(f'A{start_row}:P{end_row}', {'borders': {'top': {'style': 'SOLID'}, 'bottom': {'style': 'SOLID'}, 'left': {'style': 'SOLID'}, 'right': {'style': 'SOLID'}}})
+            ws.format(f'A{start_row}:P{end_row}', {
+                'borders': {'top': {'style': 'SOLID'}, 'bottom': {'style': 'SOLID'}, 'left': {'style': 'SOLID'}, 'right': {'style': 'SOLID'}}
+            })
         except Exception as e: print(f"❌ Results Log Error: {e}")
 
     def finalize_batch_stats(self, batch_id):
-        """The Heavy Lifter. Calculates Win Rate, PF, and PnL and updates 'Batches' sheet."""
+        """Calculates Win Rate, PF, and PnL. Updates Master sheet so you can see your gains at a glance."""
         if not self.authenticated: return
         try:
             sheet = self.client.open_by_url(SHEET_URL)
@@ -195,21 +221,21 @@ class CloudManager:
             win_rate = (len(profits) / total_trades * 100) if total_trades > 0 else 0
             pf = (sum(profits) / sum(losses)) if sum(losses) > 0 else (sum(profits) if profits else 1.0)
             
-            # Add footer stats to the batch tab
+            # Add summary footer to the specific batch tab
             ws_batch.append_row([])
             ws_batch.append_row(["COUNT:", total_trades])
             ws_batch.append_row(["GROSS PNL:", round(total_pnl, 2)])
             ws_batch.append_row(["WIN RATE:", f"{round(win_rate, 2)}%"])
             ws_batch.append_row(["PROFIT FACTOR:", round(pf, 2)])
             
-            # Update the Master 'Batches' sheet
+            # Push these stats to the Master 'Batches' list
             ws_main = sheet.worksheet("Batches")
             rows = ws_main.get_all_values()
             for idx, row in enumerate(rows):
                 if row[0] == str(batch_id):
-                    ws_main.update_cell(idx + 1, 7, total_trades) # Count
-                    ws_main.update_cell(idx + 1, 8, round(total_pnl, 2)) # PnL
-                    ws_main.update_cell(idx + 1, 9, round(pf, 2)) # PF
+                    ws_main.update_cell(idx + 1, 7, total_trades) # Trade count
+                    ws_main.update_cell(idx + 1, 8, round(total_pnl, 2)) # Total PnL
+                    ws_main.update_cell(idx + 1, 9, round(pf, 2)) # Profit Factor
                     ws_main.update_cell(idx + 1, 10, f"{round(win_rate, 1)}%") # Win Rate
                     break
         except Exception as e: print(f"❌ Finalize Stats Error: {e}")

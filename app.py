@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from src.cloud import CloudManager
 from config import USER_DEFAULT_MARKETS
 
-# 🛡️ CLOUD GUARD: We do NOT import BacktestEngine here. 
-# It lives on the VM worker only. MT5 is a Windows-only diva!
+# 🛡️ CLOUD GUARD: BacktestEngine is a Windows-only diva, so it stays on the VM.
+# We just run the remote control here. 🎮
 
 st.set_page_config(
     page_title="The Concoction Lab Cloud 🛰️",
@@ -35,9 +35,9 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("🧪 The Concoction Lab (Cloud Edition)")
-st.write("Commander, welcome back to the bridge. We've moved the logic to the cloud, but the execution stays on the ground. No cap, this is how hedge funds do it. 🏦✨")
+st.write("Commander, welcome back to the bridge. Execution stays on the ground, but the vision is in the cloud. No cap, we're institutional now. 🏦✨")
 
-# We initialize the CloudManager which is safe for Linux
+# Initialize the CloudManager (Safe for Linux/Streamlit Cloud)
 if 'cloud' not in st.session_state:
     st.session_state.cloud = CloudManager()
 
@@ -46,18 +46,23 @@ with st.expander("📡 System Status & Instructions", expanded=True):
     col_a, col_b = st.columns(2)
     with col_a:
         st.info("""
-        **How this works:**
-        1. You set the 'Mission' parameters here on the web.
-        2. Press 'Deploy' to send the mission to the **Google Sheets Tasks** sheet.
-        3. Your local Windows VM (running `worker.py`) picks it up and fires up MT5.
-        4. Results are streamed back to your Google Sheets in real-time.
+        **Mission Protocol:**
+        1. Set your 'Mission' parameters.
+        2. 'Deploy' to send orders to the **Google Sheets Tasks**.
+        3. Your local Windows VM (running `worker.py`) fires up MT5.
+        4. Results stream back to the Motherboard in real-time.
         """)
     with col_b:
+        # Check Cloud Auth Status - Real-time connectivity check
+        if st.session_state.cloud.authenticated:
+            st.success("🛰️ C2 LINK: ONLINE (Service Account is vibing)")
+        else:
+            st.error(f"🛰️ C2 LINK: OFFLINE ({st.session_state.cloud.last_error})")
+            
         st.warning("""
         **Deployment Notes:**
-        - If this app is stuck 'In the oven', verify your `requirements.txt` does NOT contain `MetaTrader5`.
-        - Ensure your `.env` secrets are added to the Streamlit Cloud Dashboard.
-        - The VM must be ON and the `worker.py` script must be running for trades to trigger.
+        - VM must be ON and `worker.py` must be active.
+        - Ensure `.env` secrets are mirrored in Streamlit Cloud Dashboard.
         """)
 
 st.divider()
@@ -68,8 +73,9 @@ with st.sidebar:
     st.write("Fine-tune the strategy before sending it to the front lines.")
     
     pairs = st.multiselect("Select Markets", USER_DEFAULT_MARKETS, default=["EURUSD", "GBPUSD", "XAUUSD"])
-    # Added M30 for that sweet spot confluence
-    tf = st.selectbox("Timeframe", ["M1", "M5", "M15", "M30", "H1", "H4", "D1"], index=2)
+    
+    # M30 is officially in the building! 📉
+    tf = st.selectbox("Timeframe", ["M1", "M5", "M15", "M30", "H1", "H4", "D1"], index=3)
     
     st.subheader("📅 Date Range")
     col1, col2 = st.columns(2)
@@ -81,7 +87,7 @@ with st.sidebar:
     st.divider()
     
     st.write("⚖️ **Strictness Level**")
-    st.caption("Higher strictness = more confluence needed (fewer, higher quality trades).")
+    st.caption("Higher strictness = more confluence needed. Don't be a gambler. 🤡")
     strictness = st.select_slider(
         "Level of confluence needed",
         options=["Low", "Medium", "High"],
@@ -101,29 +107,34 @@ st.subheader("🚀 Mission Control")
 if pairs:
     st.write(f"**Current Payload:** {len(pairs)} Pairs | {tf} Timeframe | {strictness} Strictness")
 else:
-    st.write("⚠️ *No pairs selected. Standing by...*")
+    st.write("⚠️ *No pairs selected. Standing by for orders...*")
 
 if st.button("🔥 DEPLOY MISSION TO WORKER"):
     if not pairs:
         st.error("Commander, we can't trade thin air. Pick at least one pair! 🤡")
     else:
         with st.spinner("🛰️ Contacting C2 Center (Google Sheets)..."):
-            # We request the task via Google Sheets
-            success = st.session_state.cloud.request_task(
+            # The 'Snitch' returns success and the actual error if things go south
+            success, error_msg = st.session_state.cloud.request_task(
                 pairs, tf, concoction, strictness, 
                 start_date.strftime("%Y-%m-%d"), 
                 end_date.strftime("%Y-%m-%d")
             )
             
             if success:
-                st.success("✅ MISSION DEPLOYED! Your VM should be waking up now.")
+                st.success("✅ MISSION DEPLOYED! Check the 'Tasks' sheet to watch it go.")
                 st.toast("Pips requested! 💰", icon="🚀")
                 st.balloons()
-                st.info("Head over to your Google Sheet 'Tasks' tab to watch the status change from PENDING to RUNNING.")
             else:
-                st.error("❌ Failed to contact the C2 Center. Check your logs and API credentials.")
+                st.error("❌ Failed to contact the C2 Center.")
+                with st.expander("🛠️ Debug Info (The Snitch's Report)"):
+                    st.code(error_msg)
+                    if "PERMISSION_DENIED" in error_msg:
+                        st.write("💡 Bruh, you gotta share the Google Sheet with the Service Account email as an **Editor**.")
+                    elif "API_KEY_SERVICE_DISABLED" in error_msg:
+                        st.write("💡 You need to enable the **Google Sheets API** AND the **Google Drive API** in your Google Cloud Console.")
 
 st.divider()
 st.subheader("📊 Tactical Overview")
-st.write("Check your Google Sheets for the full breakdown of Profit Factor, Win Rate, and Batch PnL.")
-st.caption("Note: This UI is a remote control. Live performance graphs coming in v6.0! 🚀")
+st.write("Head to your Google Sheet for the Profit Factor, Win Rate, and Batch PnL breakdown.")
+st.caption("Note: Live performance graphs coming in v6.0! Stay tuned. 🚀")
