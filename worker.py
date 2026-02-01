@@ -2,7 +2,6 @@ import time
 from src.backtester import BacktestEngine
 from src.cloud import CloudManager
 from datetime import datetime
-import streamlit as st # Only used for the progress bar Mock if needed
 
 class DummyProgress:
     def progress(self, val): pass
@@ -14,11 +13,9 @@ def run_worker():
     cloud = CloudManager()
     
     while True:
-        # 🕵️‍♂️ Check for PENDING missions
         tasks = cloud.get_pending_tasks()
         
         if not tasks:
-            #print("😴 No missions found. Chilling for 10s...")
             time.sleep(10)
             continue
             
@@ -27,14 +24,12 @@ def run_worker():
             cloud.update_task_status(row_idx, "RUNNING")
             
             try:
-                # 1. Startup MT5
                 success, msg = engine.startup()
                 if not success:
                     print(f"❌ MT5 Failed: {msg}")
                     cloud.update_task_status(row_idx, f"ERROR: {msg}")
                     continue
                 
-                # 2. Extract Task Details
                 pairs = task['Pairs'].split(",")
                 tf = task['TF']
                 recipe = task['Recipe'].split("+")
@@ -42,7 +37,6 @@ def run_worker():
                 start_dt = datetime.strptime(str(task['Start']), "%Y-%m-%d")
                 end_dt = datetime.strptime(str(task['End']), "%Y-%m-%d")
                 
-                # 3. Execute
                 batch_id = engine.init_batch(pairs, tf, recipe, strictness, start_dt, end_dt)
                 
                 for pair in pairs:
@@ -52,7 +46,6 @@ def run_worker():
                 engine.finalize_show(batch_id)
                 engine.shutdown()
                 
-                # 4. Success!
                 cloud.update_task_status(row_idx, f"COMPLETED (Batch {batch_id})")
                 print(f"✅ Mission Accomplished: Batch {batch_id}")
                 
