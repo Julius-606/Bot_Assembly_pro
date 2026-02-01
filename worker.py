@@ -18,7 +18,7 @@ def run_worker():
         tasks = cloud.get_pending_tasks()
         
         if not tasks:
-            print("😴 No missions found. Chilling for 10s...")
+            #print("😴 No missions found. Chilling for 10s...")
             time.sleep(10)
             continue
             
