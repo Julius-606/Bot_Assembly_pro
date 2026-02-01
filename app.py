@@ -68,7 +68,8 @@ with st.sidebar:
     st.write("Fine-tune the strategy before sending it to the front lines.")
     
     pairs = st.multiselect("Select Markets", USER_DEFAULT_MARKETS, default=["EURUSD", "GBPUSD", "XAUUSD"])
-    tf = st.selectbox("Timeframe", ["M1", "M5", "M15", "H1", "H4", "D1"], index=2)
+    # Added M30 for that sweet spot confluence
+    tf = st.selectbox("Timeframe", ["M1", "M5", "M15", "M30", "H1", "H4", "D1"], index=2)
     
     st.subheader("📅 Date Range")
     col1, col2 = st.columns(2)

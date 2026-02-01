@@ -8,8 +8,8 @@ class BrokerAPI:
         self.connected = False
         self.tf_map = {
             "M1": mt5.TIMEFRAME_M1, "M5": mt5.TIMEFRAME_M5,
-            "M15": mt5.TIMEFRAME_M15, "H1": mt5.TIMEFRAME_H1,
-            "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1
+            "M15": mt5.TIMEFRAME_M15, "M30": mt5.TIMEFRAME_M30,
+            "H1": mt5.TIMEFRAME_H1, "H4": mt5.TIMEFRAME_H4, "D1": mt5.TIMEFRAME_D1
         }
 
     def startup(self):
@@ -25,6 +25,7 @@ class BrokerAPI:
 
     def get_historical_data(self, symbol, tf_str, start_dt, end_dt):
         if not self.connected: return None
+        # Defaulting to M15 if something goes sideways, but M30 is now officially mapped
         tf = self.tf_map.get(tf_str, mt5.TIMEFRAME_M15)
         
         rates = mt5.copy_rates_range(symbol, tf, start_dt, end_dt)

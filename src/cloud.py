@@ -13,7 +13,7 @@ class CloudManager:
     def setup(self):
         """Initializes the link to the Motherboard."""
         if not GOOGLE_CREDS_DICT or "client_email" not in GOOGLE_CREDS_DICT:
-            print("⚠️ Cloud Manager standing by: Missing Credentials.")
+            print("⚠️ Cloud Manager standing by: Missing Credentials in config.")
             return
             
         try:
@@ -25,10 +25,13 @@ class CloudManager:
                 ]
             )
             self.client = gspread.authorize(creds)
+            # Try a test connection to verify auth immediately
+            self.client.open_by_url(SHEET_URL)
             self.authenticated = True
-            print("🛰️ Cloud C2 Link Established.")
+            print("🛰️ Cloud C2 Link Established. We are SO back.")
         except Exception as e:
             print(f"❌ Cloud Setup Failed: {e}")
+            self.authenticated = False
 
     def _set_dropdown_request(self, sheet_id, start_row, end_row, start_col, end_col, options):
         """Helper to create a data validation request for the Google Sheets API."""
@@ -54,12 +57,16 @@ class CloudManager:
     # --- 🛰️ MISSION CONTROL (Streamlit Side) ---
     def request_task(self, pairs, tf, recipe, strictness, start_date, end_date):
         """Drops a mission into the 'Tasks' sheet for the local worker to grab."""
-        if not self.authenticated: return False
+        if not self.authenticated: 
+            print("❌ Cannot request task: CloudManager not authenticated.")
+            return False
+            
         try:
             sheet = self.client.open_by_url(SHEET_URL)
             try:
                 ws = sheet.worksheet("Tasks")
-            except:
+            except Exception:
+                # If Tasks doesn't exist, create it with headers
                 ws = sheet.add_worksheet(title="Tasks", rows="1000", cols="10")
                 ws.append_row(["Timestamp", "Status", "Pairs", "TF", "Recipe", "Strictness", "Start", "End"])
             
@@ -75,7 +82,10 @@ class CloudManager:
             ])
             return True
         except Exception as e:
+            # This will show up in your Streamlit/Worker logs
             print(f"❌ Mission Request Error: {e}")
+            if "PERMISSION_DENIED" in str(e):
+                print("💡 Pro Tip: Did you share the sheet with your service account email?")
             return False
 
     # --- 🚜 GROUND WORKER LOGIC (Worker Side) ---
@@ -87,7 +97,8 @@ class CloudManager:
             ws = sheet.worksheet("Tasks")
             all_tasks = ws.get_all_records()
             return [(idx + 2, task) for idx, task in enumerate(all_tasks) if task.get('Status') == 'PENDING']
-        except:
+        except Exception as e:
+            print(f"⚠️ Worker polling error: {e}")
             return []
 
     def update_task_status(self, row_idx, status):
@@ -97,7 +108,8 @@ class CloudManager:
             sheet = self.client.open_by_url(SHEET_URL)
             ws = sheet.worksheet("Tasks")
             ws.update_cell(row_idx, 2, status)
-        except: pass
+        except Exception as e: 
+            print(f"⚠️ Status update failed: {e}")
 
     # --- 📊 TACTICAL LOGGING (The Sauce) ---
     def get_next_batch_id(self):
