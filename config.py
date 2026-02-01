@@ -12,7 +12,11 @@ def get_secret(key, default=None):
     try:
         # Check Streamlit's internal secrets first
         if key in st.secrets:
-            return st.secrets[key]
+            val = st.secrets[key]
+            # Streamlit Secrets proxy objects can be annoying, let's convert to dict if needed
+            if hasattr(val, "to_dict"):
+                return val.to_dict()
+            return val
     except:
         pass
     
@@ -37,27 +41,29 @@ HARDCODED_LOT_SIZE = 0.01
 CONTRACT_SIZE = 100000 
 
 # --- GOOGLE CREDS LOGIC (The Alpha Logic) ---
+# We're making this super robust because Streamlit Cloud can be a diva.
 raw_creds = get_secret("GOOGLE_CREDS")
 
+GOOGLE_CREDS_DICT = {}
+
 if raw_creds:
-    # Handle both Dict (Streamlit TOML) and String (Local .env)
+    # Scenario A: It's already a dict or a Streamlit AttrDict (from TOML sections)
     if isinstance(raw_creds, dict):
         GOOGLE_CREDS_DICT = dict(raw_creds)
-    else:
+    # Scenario B: It's a string (likely from .env or a single-line Secret)
+    elif isinstance(raw_creds, str):
         try:
-            # Clean up potential string formatting issues from .env
-            clean_json = str(raw_creds).strip().strip("'").strip('"')
+            # Clean up potential string formatting issues (quotes/whitespace)
+            clean_json = raw_creds.strip().strip("'").strip('"')
             GOOGLE_CREDS_DICT = json.loads(clean_json)
         except Exception as e:
             print(f"⚠️ CONFIG ERROR: GOOGLE_CREDS string parse failed: {e}")
-            GOOGLE_CREDS_DICT = {}
     
     # Fix the private_key formatting if it contains escaped newlines
     if "private_key" in GOOGLE_CREDS_DICT:
         GOOGLE_CREDS_DICT["private_key"] = GOOGLE_CREDS_DICT["private_key"].replace("\\n", "\n")
 else:
     print("⚠️ CONFIG ERROR: GOOGLE_CREDS not found in Secrets or .env")
-    GOOGLE_CREDS_DICT = {}
 
 # 💎 THE MARKET LIST
 USER_DEFAULT_MARKETS = [

@@ -1,0 +1,53 @@
+#🧪 THE CONCOCTION LAB - SECRETS CONFIG
+
+#Paste this into your Streamlit Cloud "Secrets" dashboard or .streamlit/secrets.toml
+
+MT5_LOGIN = 102237227
+MT5_PASSWORD = "*4HuIrLf"
+MT5_SERVER = "MetaQuotes-Demo"
+
+#Using a literal string (single quotes) for the Windows path to avoid backslash drama
+
+MT5_PATH = 'C:\Program Files\MetaTrader 5 - Backtester\terminal64.exe'
+
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/13GuBZf8hoXzQ_tDUcMeoPDWHo9SQWXYWvNmjaeNAlyc/edit?usp=sharing"
+
+[GOOGLE_CREDS]
+type = "service_account"
+project_id = "mt5-algo-bot-logger"
+private_key_id = "204abac9e2fe692a4d0542ec0cf3940d8141fb6c"
+private_key = """-----BEGIN PRIVATE KEY-----
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDeJXo05nj5XHsy
+h7Z4kicOxbnk0N+OeKeE4Y2NuAAq9P5qWjMX7sTxwAQj8aAwu5FkjB2zOstihJJH
+ou2iYKGpedLPdunYK5FpgT3smM0T4g1XHrnCfY5wxJih1YaUD/zGZlxzLQEN5E+h
+LObmpzbONYOxym99YUDDe7Ip5xfFcTwR6svwpkcGG8lqfM/lc/cSrcR/2z35q8ZV
+JN6uD89uBB3jBPJa+Z5n/xpGY5NoE1cQQpJVBviN8E+zNRzqVc5jWo5fUtUDQibB
+A/ZJxKxeMLw7lu0UZUoay7X7FsirqIkCSpAuylAN2kXYUV8p6xVof0VaOnJZ4cj4
+aDqpfYlXAgMBAAECggEAEnFoGPY9eu5rqAFOa+ouZfKSgWW5+bkYp1aWivqIwQhA
+CxJcBZOkNDHt5hIMa59W7dMYMCYkdpRtFJd5RS7inRBpKSJFPdY4J1s8ieURuaHd
+26rIX1ZPOhuIVH9GwgolwU8EQ+erm7ylw8rXjLS7PxmASoV1BiLJ3rDpVMND3Pdn
+FImFmt1MGg/t+Az+1tZwlQ2GyYdzfLLDp0avQSDkSA9pbNdqeWPp+IfC1s+VfoCl
+npyPjukC6iFjLO4zy7wMmc8XZy6y+7SFChN1OALpI/Jyq6Bzqr6u7Zd7Noz2CloL+
+vWEct+PPfgAhqEoTsZBkjojpM1tntHXupO9axUQMiQKBgQD4n416ggVvwrOLKW6p
+4vmADEJEQaqnyVSq45ifYzuSaRAuZ6VnoXIAd8ym24Suaj9vwBju4Saae5OkMxfu
+EETWR+X0S/8hExChEAPUdMZfiHfWsNvrUbdmjF5YPI7kA5MO48uMQ1j20UKJpQhf
+G0kKTl9p5ukll8nF7gLmlV/qFQKBgQDkvNEOCcHfJpxrnIXBVIVQU5/H/eh1PyY0
+nQ2oRSENUA8zpU1pqFaS3E6162RQf0GR+WBpPrAyvCaU/od+XlIEiDiiGKpLQeks
+8u0VRKE/klDMGRzVaVu8bef0fbBRP1KhY25/ALtLIWpZC7p8bXto1FO4Dl3P8LzS
+3hMZPJZcuwKBgBO996oGsQ/S0hb2z0bGMzGrx4dL/5UbM5HuSKw/YPebSCGnMUct
+VrQazzFgtQR0g10IT/KIBly1+19Kf1f0CsNJKkVf03542RUxBFzWePoVCA8QNCZX
+csy90LAI/v+0GPVRuVQF9QaET1hGtod2zzH2TzVFlLXbe7Yv1CMjMV6RAoGAbqEH
+92MuulABXWaxpmTLqaMYZ3Ddij+FqfK/1T/CEZ9ECvWLMGvzm0okY4Y62VgDDafw
+QlbIf3FSs8M7IxpZTsnXokaNrqJtNYk0s5Gi741DuML4mBtB/CuoAS79JP6cZ2Qg
+4Bope9foiLLMeju1cWkoKKACLX1AxjgUQqN0EdsCgYBMQT5c0Exv8nt6ZY5LzK3d
+cfZ3e1yC1n/XGkZk58njNx1V93XXLr5ECUAzk1++Mq/fuhtibq49CEYZ2cUkcYNd
+DTOlUoiDtjIKNrhYtDTYfxLxs3u3f1mN6550dAjVwnZTpR270TCNaWqYpY3HwCQ1
+rA6xE2a/MenoqHGBkagX2w==
+-----END PRIVATE KEY-----"""
+client_email = "mt5-logger-sa@mt5-algo-bot-logger.iam.gserviceaccount.com"
+client_id = "101479527830343877881"
+auth_uri = "https://accounts.google.com/o/oauth2/auth"
+token_uri = "https://oauth2.googleapis.com/token"
+auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
+client_x509_cert_url = "https://www.googleapis.com/robot/v1/metadata/x509/mt5-logger-sa%40mt5-algo-bot-logger.iam.gserviceaccount.com"
+universe_domain = "googleapis.com"
