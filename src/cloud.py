@@ -121,23 +121,40 @@ class CloudManager:
                 })
                 ws.freeze(rows=1)
                 return 1
-            ids = ws.col_values(1)
-            return int(ids[-1]) + 1 if len(ids) > 1 else 1
+            
+            # Improved ID sniffing: Filter out non-numeric noise
+            col_a = ws.col_values(1)
+            numeric_ids = [int(val) for val in col_a[1:] if str(val).isdigit()]
+            return max(numeric_ids) + 1 if numeric_ids else 1
         except: return 1
 
     def log_batch_meta(self, data):
-        """Logs the strategy setup and adds interactive dropdowns."""
+        """Logs the strategy setup and ensures it appends inside the table."""
         if not self.authenticated: return
         try:
             sheet = self.client.open_by_url(SHEET_URL)
             ws = sheet.worksheet("Batches")
-            ws.append_row(data)
-            row_idx = len(ws.get_all_values())
+            
+            # Find the first truly empty row in Column A to avoid overwriting Batch 1
+            col_a = ws.col_values(1)
+            row_idx = 2 # Start below header
+            for i, val in enumerate(col_a):
+                if i > 0: # Skip header
+                    if not val or str(val).strip() == "":
+                        row_idx = i + 1
+                        break
+                    row_idx = i + 2 # If we hit the end, it's next row
+            
+            # Use update instead of append_row to force it into the specific slot
+            range_label = f"A{row_idx}:F{row_idx}"
+            ws.update(range_label, [data])
+            
             ws.format(f'A{row_idx}:J{row_idx}', {
                 'borders': {'top': {'style': 'SOLID'}, 'bottom': {'style': 'SOLID'}, 'left': {'style': 'SOLID'}, 'right': {'style': 'SOLID'}},
                 'horizontalAlignment': 'CENTER'
             })
-            # Add interactive dropdown for strictness just in case you want to tweak it manually later
+            
+            # Re-apply dropdown for the new row
             requests = [self._set_dropdown_request(ws.id, row_idx - 1, row_idx, 5, 6, ['Low', 'Medium', 'High'])]
             sheet.batch_update({"requests": requests})
         except Exception as e: print(f"❌ Batch Meta Error: {e}")
@@ -158,7 +175,6 @@ class CloudManager:
                     'backgroundColor': {'red': 0.1, 'green': 0.35, 'blue': 0.25}
                 })
                 
-                # Dynamic Green/Red formatting for PnL column (O) - Visual Alpha!
                 requests = [
                     {
                         "addConditionalFormatRule": {
@@ -203,7 +219,7 @@ class CloudManager:
         except Exception as e: print(f"❌ Results Log Error: {e}")
 
     def finalize_batch_stats(self, batch_id):
-        """Calculates Win Rate, PF, and PnL. Updates Master sheet so you can see your gains at a glance."""
+        """Calculates Win Rate, PF, and PnL. Updates Master sheet."""
         if not self.authenticated: return
         try:
             sheet = self.client.open_by_url(SHEET_URL)
@@ -221,21 +237,21 @@ class CloudManager:
             win_rate = (len(profits) / total_trades * 100) if total_trades > 0 else 0
             pf = (sum(profits) / sum(losses)) if sum(losses) > 0 else (sum(profits) if profits else 1.0)
             
-            # Add summary footer to the specific batch tab
+            # Summary footer
             ws_batch.append_row([])
             ws_batch.append_row(["COUNT:", total_trades])
             ws_batch.append_row(["GROSS PNL:", round(total_pnl, 2)])
             ws_batch.append_row(["WIN RATE:", f"{round(win_rate, 2)}%"])
             ws_batch.append_row(["PROFIT FACTOR:", round(pf, 2)])
             
-            # Push these stats to the Master 'Batches' list
+            # Update Master List
             ws_main = sheet.worksheet("Batches")
             rows = ws_main.get_all_values()
             for idx, row in enumerate(rows):
                 if row[0] == str(batch_id):
-                    ws_main.update_cell(idx + 1, 7, total_trades) # Trade count
-                    ws_main.update_cell(idx + 1, 8, round(total_pnl, 2)) # Total PnL
-                    ws_main.update_cell(idx + 1, 9, round(pf, 2)) # Profit Factor
-                    ws_main.update_cell(idx + 1, 10, f"{round(win_rate, 1)}%") # Win Rate
+                    ws_main.update_cell(idx + 1, 7, total_trades)
+                    ws_main.update_cell(idx + 1, 8, round(total_pnl, 2))
+                    ws_main.update_cell(idx + 1, 9, round(pf, 2))
+                    ws_main.update_cell(idx + 1, 10, f"{round(win_rate, 1)}%")
                     break
         except Exception as e: print(f"❌ Finalize Stats Error: {e}")
