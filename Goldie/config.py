@@ -1,13 +1,24 @@
 import os
 import sys
 import json
+from pathlib import Path
 from dotenv import load_dotenv
 
 # ------------------------------------------------------------------------------
 # 🔐 LOAD SECRETS (ENV)
 # ------------------------------------------------------------------------------
-# Load the .env file from the root directory
-load_dotenv()
+# Explicitly load the .env file located next to this config file (Goldie/.env)
+# and override existing environment variables so the bot uses its local settings.
+dotenv_path = Path(__file__).resolve().with_name('.env')
+load_dotenv(dotenv_path=dotenv_path, override=True)
+
+# Debug: show effective MT5_LOGIN loaded for this bot
+try:
+    _dbg = os.getenv('MT5_LOGIN')
+    if _dbg:
+        print(f"   🧭 Goldie config: loaded .env from {dotenv_path} -> MT5_LOGIN={_dbg}")
+except Exception:
+    pass
 
 # ==============================================================================
 # ---- Goldie Locks Config ----

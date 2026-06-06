@@ -19,3 +19,6 @@ credentials.json
 📉 Logs
 
 *.log
+
+# Ignore local Terminal folder (user-added runtime files)
+Local/
