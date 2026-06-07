@@ -7,6 +7,7 @@ pycache/
 🔧 MT5 & Environment
 
 venv/
+.venv
 .env
 .DS_Store
 
@@ -19,3 +20,4 @@ credentials.json
 📉 Logs
 
 *.log
+.toml
