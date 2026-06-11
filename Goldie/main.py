@@ -200,8 +200,8 @@ def check_weekend_chill(broker, cloud, tg_bot):
     weekday = now.weekday()
     hour = now.hour
     
-    # 1. Friday Night (After 20:00)
-    is_friday_close = (weekday == 4 and hour >= 20)
+    # 1. Friday Night (After 18:00)
+    is_friday_close = (weekday == 4 and hour >= 18)
     # 2. Weekend (Saturday 5, Sunday 6)
     is_weekend = (weekday == 5 or weekday == 6)
 
