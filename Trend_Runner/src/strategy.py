@@ -10,42 +10,6 @@ import sys
 from datetime import datetime
 
 # ==============================================================================
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -102,9 +66,7 @@ STRATEGY_STATE = {
         "STOCH_LIMIT_LOW": 20,
         "STOCH_LIMIT_HIGH": 80
     },
-    "BENCHED_PAIRS": {
-        "EURAUD": "2026-01-30 17:06:37"
-    },
+    "BENCHED_PAIRS": {},
     "MODE": "STANDARD"
 }
 # ==============================================================================
