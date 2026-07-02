@@ -61,6 +61,50 @@ from datetime import datetime
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -86,35 +130,28 @@ STRATEGY_STATE = {
         "TRIX"
     ],
     "ACTIVE_CONCOCTION": [
-        "Donch",
-        "WillR",
-        "ADX"
+        "EMA",
+        "Bol"
     ],
     "PARAMS": {
-        "EMA_FAST": 20,
-        "EMA_SLOW": 80,
-        "RSI_PERIOD": 14,
-        "RSI_LIMIT_LOW": 30,
-        "RSI_LIMIT_HIGH": 70,
+        "EMA_PERIOD": 20,
+        "BOL_PERIOD": 20,
+        "BOL_DEVIATIONS": 2.0,
         "ATR_PERIOD": 20,
-        "ATR_MULTIPLIER": 3.0,
-        "RISK_REWARD": 2.0,
-        "ADX_THRESHOLD": 30,
-        "DONCHIAN_PERIOD": 40,
-        "KELTNER_MULT": 2.0,
-        "FIB_LOOKBACK": 100,
-        "SMA_PERIOD": 50,
-        "WILLIAMS_PERIOD": 14,
-        "MFI_PERIOD": 14,
-        "ROC_PERIOD": 12,
-        "TRIX_PERIOD": 15
+        "ATR_MULTIPLIER": 2.0,
+        "RISK_REWARD": 2.0
     },
     "BENCHED_PAIRS": {
-        "NZDJPY": "2026-01-30 19:56:11",
-        "GBPAUD": "2026-01-30 19:56:11",
-        "EURCAD": "2026-01-30 19:56:11",
-        "EURJPY": "2026-01-30 19:56:11",
-        "CHFJPY": "2026-01-30 19:56:11"
+        "USDJPY": "2026-06-18 12:07:29",
+        "GBPUSD": "2026-06-18 12:07:29",
+        "EURJPY": "2026-06-18 12:07:29",
+        "NZDUSD": "2026-06-18 12:07:29",
+        "EURAUD": "2026-06-18 12:07:29",
+        "EURGBP": "2026-06-18 12:07:29",
+        "GBPJPY": "2026-06-18 12:07:29",
+        "CHFJPY": "2026-06-18 12:07:29",
+        "AUDJPY": "2026-06-18 12:07:29",
+        "AUDUSD": "2026-06-18 12:07:29"
     },
     "MODE": "STANDARD"
 }
