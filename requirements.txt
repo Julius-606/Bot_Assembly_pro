@@ -10,4 +10,4 @@ python-telegram-bot
 google-api-python-client
 google-generativeai 
 dotenv
-MetaTrader5==5
+MetaTrader5==5.0.5735

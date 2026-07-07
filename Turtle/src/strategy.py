@@ -22,6 +22,15 @@ from datetime import datetime
 
 
 
+
+
+
+
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -47,9 +56,9 @@ STRATEGY_STATE = {
         "TRIX"
     ],
     "ACTIVE_CONCOCTION": [
-        "ADX",
-        "MACD",
-        "RSI"
+        "Bol",
+        "RSI",
+        "MACD"
     ],
     "PARAMS": {
         "EMA_FAST": 10,
@@ -58,11 +67,11 @@ STRATEGY_STATE = {
         "RSI_LIMIT_LOW": 30,
         "RSI_LIMIT_HIGH": 70,
         "ATR_PERIOD": 14,
-        "ATR_MULTIPLIER": 3.0,
-        "RISK_REWARD": 2.0,
-        "ADX_THRESHOLD": 35,
+        "ATR_MULTIPLIER": 4.0,
+        "RISK_REWARD": 2.5,
+        "ADX_THRESHOLD": 25,
         "DONCHIAN_PERIOD": 30,
-        "KELTNER_MULT": 2.0,
+        "KELTNER_MULT": 2.5,
         "FIB_LOOKBACK": 100,
         "SMA_PERIOD": 200,
         "WILLIAMS_PERIOD": 14,
@@ -71,11 +80,17 @@ STRATEGY_STATE = {
         "TRIX_PERIOD": 15,
         "MACD_FAST_PERIOD": 12,
         "MACD_SLOW_PERIOD": 26,
-        "MACD_SIGNAL_PERIOD": 9
+        "MACD_SIGNAL_PERIOD": 9,
+        "BOL_PERIOD": 20,
+        "BOL_STD_DEV": 2.0
     },
     "BENCHED_PAIRS": {
-        "BTCUSD": "2050-01-30 06:44:34",
-        "ETHUSD": "2050-01-30 06:44:34"
+        "USDJPY": "2026-07-04 20:37:47",
+        "EURGBP": "2026-07-04 20:37:47",
+        "EURJPY": "2026-07-04 20:37:47",
+        "CADJPY": "2026-07-04 20:37:47",
+        "GBPJPY": "2026-07-04 20:37:47",
+        "AUDJPY": "2026-07-04 20:37:47"
     },
     "MODE": "STANDARD"
 }

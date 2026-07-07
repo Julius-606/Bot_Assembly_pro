@@ -1,6 +1,7 @@
 import json
 import io
 import time
+import copy
 import requests
 import gspread 
 import pandas as pd
@@ -35,11 +36,18 @@ class CloudManager:
             "strategy_params": DEFAULT_PARAMS,
             "open_bot_trades": [], 
             "trade_history": [],
-            "last_update_id": 0
+            "last_update_id": 0,
+            "ai_change_pending": False
         }
         
         self.setup()
         self.load_memory()
+
+    def _apply_defaults(self, state):
+        merged = copy.deepcopy(self.default_state)
+        if state:
+            merged.update(state)
+        return merged
 
     def setup(self):
         """Authenticates with Google."""
@@ -63,20 +71,21 @@ class CloudManager:
         """Loads memory from local JSON file."""
         try:
             with open(MEMORY_FILENAME, "r") as f:
-                self.state = json.load(f)
-            print(f"   🧠 Syncing with Hive Mind ({MEMORY_FILENAME})...")
-            print("   ✅ Memory Downloaded.")
+                self.state = self._apply_defaults(json.load(f))
+            #print(f"   🧠 Syncing with Hive Mind ({MEMORY_FILENAME})...")
+            #print("   ✅ Memory Downloaded.")
         except FileNotFoundError:
             print("   🧠 No memory file found. Starting fresh.")
-            self.state = self.default_state
+            self.state = self._apply_defaults({})
             self.save_memory()
         except Exception as e:
             print(f"   ⚠️ Memory Read Error: {e}")
-            self.state = self.default_state
+            self.state = self._apply_defaults({})
 
     def save_memory(self):
         """Saves current state to local JSON file."""
         try:
+            self.state = self._apply_defaults(self.state)
             with open(MEMORY_FILENAME, "w") as f:
                 json.dump(self.state, f, indent=4)
         except Exception as e:
