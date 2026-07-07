@@ -1,0 +1,23 @@
+﻿Requirement already satisfied: pandas==2.2.0 in .\.venv\Lib\site-packages (from -r requirements.txt (line 1)) (2.2.0)
+Requirement already satisfied: streamlit==1.31.0 in .\.venv\Lib\site-packages (from -r requirements.txt (line 2)) (1.31.0)
+Requirement already satisfied: gspread==6.0.0 in .\.venv\Lib\site-packages (from -r requirements.txt (line 3)) (6.0.0)
+Requirement already satisfied: google-auth==2.27.0 in .\.venv\Lib\site-packages (from -r requirements.txt (line 4)) (2.27.0)
+Requirement already satisfied: ta==0.11.0 in .\.venv\Lib\site-packages (from -r requirements.txt (line 5)) (0.11.0)
+Requirement already satisfied: python-dotenv==1.0.1 in .\.venv\Lib\site-packages (from -r requirements.txt (line 6)) (1.0.1)
+Requirement already satisfied: numpy==1.26.4 in .\.venv\Lib\site-packages (from -r requirements.txt (line 7)) (1.26.4)
+Requirement already satisfied: requests==2.31.0 in .\.venv\Lib\site-packages (from -r requirements.txt (line 8)) (2.31.0)
+Requirement already satisfied: python-telegram-bot in .\.venv\Lib\site-packages (from -r requirements.txt (line 9)) (22.7)
+Requirement already satisfied: google-api-python-client in .\.venv\Lib\site-packages (from -r requirements.txt (line 10)) (2.196.0)
+Requirement already satisfied: google-generativeai in .\.venv\Lib\site-packages (from -r requirements.txt (line 11)) (0.8.6)
+Requirement already satisfied: dotenv in .\.venv\Lib\site-packages (from -r requirements.txt (line 12)) (0.9.9)
+python.exe : ERROR: Could not find a version that satisfies the requirement MetaTrader5==5 (from versions: 5.0.44, 
+5.0.45, 5.0.47, 5.0.50, 5.0.4200, 5.0.4287, 5.0.4288, 5.0.4424, 5.0.4682, 5.0.4687, 5.0.4731, 5.0.4732, 5.0.4738, 
+5.0.4803, 5.0.4874, 5.0.4993, 5.0.5050, 5.0.5120, 5.0.5200, 5.0.5260, 5.0.5328, 5.0.5370, 5.0.5387, 5.0.5388, 
+5.0.5430, 5.0.5488, 5.0.5509, 5.0.5572, 5.0.5640, 5.0.5735)
+At line:2 char:1
++ & .venv\Scripts\python -m pip install -r requirements.txt 2>&1 | Out- ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (ERROR: Could no...5640, 5.0.5735):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ERROR: No matching distribution found for MetaTrader5==5

@@ -2,13 +2,13 @@
 
 #Paste this into your Streamlit Cloud "Secrets" dashboard or .streamlit/secrets.toml
 
-MT5_LOGIN = 102237227
-MT5_PASSWORD = "*4HuIrLf"
+MT5_LOGIN = 5050971317
+MT5_PASSWORD = "DtO_ZlC7"
 MT5_SERVER = "MetaQuotes-Demo"
 
 #Using a literal string (single quotes) for the Windows path to avoid backslash drama
 
-MT5_PATH = 'C:\Program Files\MetaTrader 5 - Backtester\terminal64.exe'
+MT5_PATH = 'C:\Program Files\MetaTrader 5\terminal64.exe'
 
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/13GuBZf8hoXzQ_tDUcMeoPDWHo9SQWXYWvNmjaeNAlyc/edit?usp=sharing"
 
