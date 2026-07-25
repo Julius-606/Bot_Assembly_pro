@@ -77,6 +77,14 @@ from datetime import datetime
 
 
 
+
+
+
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -131,12 +139,13 @@ STRATEGY_STATE = {
     "BENCHED_PAIRS": {
         "BTCUSD": "2050-01-30 06:44:34",
         "ETHUSD": "2050-01-30 06:44:34",
-        "USDJPY": "2026-07-01 17:50:56",
-        "EURGBP": "2026-07-01 17:50:56",
-        "EURJPY": "2026-07-01 17:50:56",
-        "CADJPY": "2026-07-01 17:50:56",
-        "GBPJPY": "2026-07-01 17:50:56",
-        "AUDJPY": "2026-07-01 17:50:56"
+        "USDJPY": "2026-07-14 17:49:01",
+        "AUDNZD": "2026-07-14 17:49:01",
+        "EURJPY": "2026-07-14 17:49:01",
+        "CADJPY": "2026-07-14 17:49:01",
+        "GBPJPY": "2026-07-14 17:49:01",
+        "CHFJPY": "2026-07-14 17:49:01",
+        "AUDJPY": "2026-07-14 17:49:01"
     },
     "MODE": "STANDARD"
 }
