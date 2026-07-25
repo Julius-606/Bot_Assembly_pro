@@ -20,7 +20,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # ==============================================================================
 # 'FIXED' -> AI CANNOT change 'ACTIVE_CONCOCTION' (Ingredients). Only tunes 'PARAMS'.
 # 'FREE'  -> AI has full control to change 'ACTIVE_CONCOCTION' and 'PARAMS'.
-AI_CONTROL_MODE = "FREE" 
+AI_CONTROL_MODE = "FIXED" 
 # ==============================================================================
 
 class Coach:

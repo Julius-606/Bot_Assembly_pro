@@ -20,4 +20,10 @@ credentials.json
 📉 Logs
 
 *.log
+<<<<<<< HEAD
 .toml
+=======
+
+# Ignore local Terminal folder (user-added runtime files)
+Local/
+>>>>>>> refs/remotes/origin/main

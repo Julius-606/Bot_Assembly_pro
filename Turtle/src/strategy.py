@@ -31,11 +31,60 @@ from datetime import datetime
 
 
 
+<<<<<<< HEAD
+=======
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+>>>>>>> refs/remotes/origin/main
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
 STRATEGY_STATE = {
-    "VERSION": "3.2",
+    "VERSION": "3.4",
     "MENU": [
         "EMA",
         "RSI",
@@ -64,11 +113,15 @@ STRATEGY_STATE = {
         "EMA_FAST": 10,
         "EMA_SLOW": 21,
         "RSI_PERIOD": 14,
-        "RSI_LIMIT_LOW": 30,
-        "RSI_LIMIT_HIGH": 70,
+        "RSI_LIMIT_LOW": 20,
+        "RSI_LIMIT_HIGH": 80,
         "ATR_PERIOD": 14,
         "ATR_MULTIPLIER": 4.0,
+<<<<<<< HEAD
         "RISK_REWARD": 2.5,
+=======
+        "RISK_REWARD": 1.0,
+>>>>>>> refs/remotes/origin/main
         "ADX_THRESHOLD": 25,
         "DONCHIAN_PERIOD": 30,
         "KELTNER_MULT": 2.5,
@@ -85,12 +138,23 @@ STRATEGY_STATE = {
         "BOL_STD_DEV": 2.0
     },
     "BENCHED_PAIRS": {
+<<<<<<< HEAD
         "USDJPY": "2026-07-04 20:37:47",
         "EURGBP": "2026-07-04 20:37:47",
         "EURJPY": "2026-07-04 20:37:47",
         "CADJPY": "2026-07-04 20:37:47",
         "GBPJPY": "2026-07-04 20:37:47",
         "AUDJPY": "2026-07-04 20:37:47"
+=======
+        "BTCUSD": "2050-01-30 06:44:34",
+        "ETHUSD": "2050-01-30 06:44:34",
+        "USDJPY": "2026-07-01 17:50:56",
+        "EURGBP": "2026-07-01 17:50:56",
+        "EURJPY": "2026-07-01 17:50:56",
+        "CADJPY": "2026-07-01 17:50:56",
+        "GBPJPY": "2026-07-01 17:50:56",
+        "AUDJPY": "2026-07-01 17:50:56"
+>>>>>>> refs/remotes/origin/main
     },
     "MODE": "STANDARD"
 }
