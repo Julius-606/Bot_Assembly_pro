@@ -35,7 +35,7 @@ from datetime import datetime
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
 STRATEGY_STATE = {
-    "VERSION": "3.2",
+    "VERSION": "3.4",
     "MENU": [
         "EMA",
         "RSI",
@@ -64,8 +64,8 @@ STRATEGY_STATE = {
         "EMA_FAST": 10,
         "EMA_SLOW": 21,
         "RSI_PERIOD": 14,
-        "RSI_LIMIT_LOW": 30,
-        "RSI_LIMIT_HIGH": 70,
+        "RSI_LIMIT_LOW": 20,
+        "RSI_LIMIT_HIGH": 80,
         "ATR_PERIOD": 14,
         "ATR_MULTIPLIER": 4.0,
         "RISK_REWARD": 2.5,
