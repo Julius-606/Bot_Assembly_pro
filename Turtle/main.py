@@ -25,7 +25,10 @@ try:
     from src.telegram_bot import TelegramBot
     from src.coach import Coach # 🧢 The Boss
     # Added MAX_RISK_PCT and BLACKLIST_ASSETS to import
-    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS, MAX_RISK_PCT, BLACKLIST_ASSETS, MT5_PATH
+    from config import (
+        TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS,
+        MAX_RISK_PCT, BLACKLIST_ASSETS, MT5_PATH, BOT_IDENTITY, DEFAULT_STRATEGY
+    )
     print("✅ The squad is assembled.")
 except ImportError as e:
     print(f"💀 CRITICAL IMPORT ERROR: {e}")
@@ -39,7 +42,7 @@ MT5_RETRY_INTERVAL = 300
 def launch_mt5():
     """Relaunches MT5 terminal."""
     try:
-        print("🚀 Relaunching MT5 terminal...")
+        print(f"🚀 Relaunching MT5 terminal for {BOT_IDENTITY}...")
         subprocess.Popen([MT5_PATH])
         time.sleep(30) # Give it 30s to initialize fully
         return True
@@ -255,7 +258,7 @@ def check_weekend_chill(broker, cloud, tg_bot):
     return False
 
 def main():
-    print("🚀 INITIALIZING TURTLE V3.0.0 (Autonomy Update)...")
+    print(f"🚀 INITIALIZING {BOT_IDENTITY.upper()} V3.0.0 (Autonomy Update)...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
     print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
     print(f"   🚫 Strict Mode: NO METALS or CRYPTO Allowed.")
@@ -294,17 +297,17 @@ def main():
             
             if cmd == "pause":
                 my_cloud.state['status'] = 'paused'
-                tg_bot.send_msg("⏸️ Bot PAUSED. No new entries. (Managing existing trades)")
+                tg_bot.send_msg(f"⏸️ {BOT_IDENTITY.capitalize()} PAUSED. No new entries. (Managing existing trades)")
                 my_cloud.save_memory()
             elif cmd == "resume":
                 my_cloud.state['status'] = 'running'
-                tg_bot.send_msg("▶️ Bot RESUMED. Hunting...")
+                tg_bot.send_msg(f"▶️ {BOT_IDENTITY.capitalize()} RESUMED. Hunting...")
                 my_cloud.save_memory()
             elif cmd == "status":
                 bal = my_cloud.state.get('current_balance', 0)
                 active_count = len(my_cloud.state.get('open_bot_trades', []))
                 status_msg = (
-                    f"📊 STATUS REPORT\n"
+                    f"📊 {BOT_IDENTITY.upper()} STATUS REPORT\n"
                     f"State: {my_cloud.state.get('status')}\n"
                     f"Balance: ${bal}\n"
                     f"Open Trades: {active_count}\n"
@@ -329,12 +332,12 @@ def main():
                 if my_broker.startup():
                     next_mt5_retry_at = 0
                     if not bot_online_announced:
-                        tg_bot.send_msg(f"🤖 Turtle Online!\nStrategy: {my_strategy.name}")
+                        tg_bot.send_msg(f"🤖 {BOT_IDENTITY.capitalize()} Online!\nStrategy: {my_strategy.name}")
                         bot_online_announced = True
                     else:
                         tg_bot.send_msg("✅ MT5 Reconnected.")
                 else:
-                    tg_bot.send_msg("🚨 CRITICAL: MT5 Connection Failed! Retrying in 5 minutes.")
+                    tg_bot.send_msg(f"🚨 CRITICAL: {BOT_IDENTITY.capitalize()} MT5 Connection Failed! Retrying in 5 minutes.")
                     next_mt5_retry_at = time.time() + MT5_RETRY_INTERVAL
 
             if not my_broker.connected:
@@ -497,7 +500,7 @@ def main():
             # 🚑 MT5 Relaunch Protocol
             if "'NoneType' object is not iterable" in error_msg:
                 print(f"🚑 MT5 RECOVERY: {error_msg}")
-                tg_bot.send_msg("🚨 MT5 Connection Lost. Attempting to relaunch terminal...")
+                tg_bot.send_msg(f"🚨 {BOT_IDENTITY.capitalize()} MT5 Connection Lost. Attempting to relaunch terminal...")
                 
                 # Disconnect before relaunch
                 my_broker.shutdown()

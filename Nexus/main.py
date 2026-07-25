@@ -1,11 +1,12 @@
 # ==============================================================================
-# ---- Trend Runner Main v2.4.1 (Hindenburg Fix) ----
+# ---- Nexus Main v3.0.0 (Autonomy Update) ----
 # ==============================================================================
 import sys
 import os
 import time
 from datetime import datetime
 import MetaTrader5 as mt5
+import subprocess
 
 # -------------------------------------------------------------------------
 # 🔧 PATHING FIX
@@ -24,15 +25,34 @@ try:
     from src.telegram_bot import TelegramBot
     from src.coach import Coach # 🧢 The Boss
     # Added MAX_RISK_PCT and BLACKLIST_ASSETS to import
-    from config import TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS, MAX_RISK_PCT, BLACKLIST_ASSETS
+    from config import (
+        TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS,
+        MAX_RISK_PCT, BLACKLIST_ASSETS, MT5_PATH, BOT_IDENTITY, DEFAULT_STRATEGY
+    )
     print("✅ The squad is assembled.")
 except ImportError as e:
-    print(f"\n💀 CRITICAL IMPORT ERROR: {e}")
+    print(f"💀 CRITICAL IMPORT ERROR: {e}")
     sys.exit(1)
+
+MT5_RETRY_INTERVAL = 300
 
 # -------------------------------------------------------------------------
 # 🧠 HELPER LOGIC
 # -------------------------------------------------------------------------
+def launch_mt5():
+    """Relaunches MT5 terminal."""
+    try:
+        print(f"🚀 Relaunching MT5 terminal for {BOT_IDENTITY}...")
+        subprocess.Popen([MT5_PATH])
+        time.sleep(30) # Give it 30s to initialize fully
+        return True
+    except FileNotFoundError:
+        print(f"   ❌ MT5 Not Found at: {MT5_PATH}")
+        return False
+    except Exception as e:
+        print(f"   ❌ Error launching MT5: {e}")
+        return False
+
 def sync_balance(broker, cloud):
     """
     🏦 The Banker.
@@ -238,7 +258,7 @@ def check_weekend_chill(broker, cloud, tg_bot):
     return False
 
 def main():
-    print("\n🚀 INITIALIZING TREND RUNNER V2.4.1 (Hindenburg Fix)...")
+    print(f"🚀 INITIALIZING {BOT_IDENTITY.upper()} V3.0.0 (Autonomy Update)...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
     print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
     print(f"   🚫 Strict Mode: NO METALS or CRYPTO Allowed.")
@@ -259,12 +279,8 @@ def main():
     
     tg_bot = TelegramBot()
 
-    # 2. Connect to MT5
-    if not my_broker.startup():
-        tg_bot.send_msg("🚨 CRITICAL: MT5 Connection Failed!")
-        sys.exit(1)
-
-    tg_bot.send_msg(f"🤖 Trend Runner Online!\nStrategy: {my_strategy.name}")
+    next_mt5_retry_at = 0
+    bot_online_announced = False
 
     # Timer for Silence Check (Don't check every loop, check every hour)
     last_silence_check = time.time()
@@ -273,11 +289,7 @@ def main():
     # 3. Main Loop
     while True:
         try:
-            # Sync Real Balance
-            sync_balance(my_broker, my_cloud)
-            
-            # 🛠️ HINDENBURG FIX: Refresh Strategy State EVERY LOOP
-            # This ensures we know who is benched immediately after Coach updates the file
+            my_cloud.load_memory()
             my_strategy.refresh_state()
 
             # Check for Telegram Commands
@@ -285,17 +297,17 @@ def main():
             
             if cmd == "pause":
                 my_cloud.state['status'] = 'paused'
-                tg_bot.send_msg("⏸️ Bot PAUSED. No new entries. (Managing existing trades)")
+                tg_bot.send_msg(f"⏸️ {BOT_IDENTITY.capitalize()} PAUSED. No new entries. (Managing existing trades)")
                 my_cloud.save_memory()
             elif cmd == "resume":
                 my_cloud.state['status'] = 'running'
-                tg_bot.send_msg("▶️ Bot RESUMED. Hunting...")
+                tg_bot.send_msg(f"▶️ {BOT_IDENTITY.capitalize()} RESUMED. Hunting...")
                 my_cloud.save_memory()
             elif cmd == "status":
                 bal = my_cloud.state.get('current_balance', 0)
                 active_count = len(my_cloud.state.get('open_bot_trades', []))
                 status_msg = (
-                    f"📊 STATUS REPORT\n"
+                    f"📊 {BOT_IDENTITY.upper()} STATUS REPORT\n"
                     f"State: {my_cloud.state.get('status')}\n"
                     f"Balance: ${bal}\n"
                     f"Open Trades: {active_count}\n"
@@ -310,6 +322,34 @@ def main():
                 # 🧢 MANUAL FORCE CONSULTATION
                 tg_bot.send_msg("🤖 Force-Consulting the Oracle...")
                 my_coach.consult_oracle(force=True)
+
+            # Refresh state again after commands in case Coach changed strategy or memory.
+            my_cloud.load_memory()
+            my_strategy.refresh_state()
+
+            # Reconnect MT5 on a 5-minute schedule while keeping Telegram responsive.
+            if not my_broker.connected and time.time() >= next_mt5_retry_at:
+                if my_broker.startup():
+                    next_mt5_retry_at = 0
+                    if not bot_online_announced:
+                        tg_bot.send_msg(f"🤖 {BOT_IDENTITY.capitalize()} Online!\nStrategy: {my_strategy.name}")
+                        bot_online_announced = True
+                    else:
+                        tg_bot.send_msg("✅ MT5 Reconnected.")
+                else:
+                    tg_bot.send_msg(f"🚨 CRITICAL: {BOT_IDENTITY.capitalize()} MT5 Connection Failed! Retrying in 5 minutes.")
+                    next_mt5_retry_at = time.time() + MT5_RETRY_INTERVAL
+
+            if not my_broker.connected:
+                time.sleep(5)
+                continue
+
+            # Sync Real Balance
+            sync_balance(my_broker, my_cloud)
+
+            # 🛠️ HINDENBURG FIX: Refresh Strategy State EVERY LOOP
+            # This ensures we know who is benched immediately after Coach updates the file
+            my_strategy.refresh_state()
 
             # Audit existing trades (Logs closes)
             # If a trade closed, we wake up the Coach immediately 🧢
@@ -399,8 +439,14 @@ def main():
                                 
                             sl = new_sl # Apply the new SL
 
+                        trade_comment = comment
+                        if my_cloud.state.get('ai_change_pending'):
+                            trade_comment = f"{trade_comment} 🕹"
+                            my_cloud.state['ai_change_pending'] = False
+                            my_cloud.save_memory()
+
                         # Execute
-                        result = my_broker.execute_trade(pair, signal, volume, sl, tp, comment)
+                        result = my_broker.execute_trade(pair, signal, volume, sl, tp, trade_comment)
                         
                         if result:
                             server_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -417,7 +463,7 @@ def main():
 
                             trade_data = {
                                 'ticket': result.order,
-                                'strategy': comment,
+                                'strategy': trade_comment,
                                 'signal': signal,
                                 'pair': pair,
                                 'open_time': server_time,
@@ -445,13 +491,32 @@ def main():
             time.sleep(10)
 
         except KeyboardInterrupt:
-            print("\n🛑 Manual Shutdown.")
+            print("🛑 Manual Shutdown.")
             break # Exit the loop only on manual command
         except Exception as e:
             # 🛡️ THE CRASH CATCHER
-            # We catch it, print it, notify you, and KEEP GOING.
-            print(f"📉 CRITICAL CRASH: {e}")
-            tg_bot.send_msg(f"📉 CRITICAL CRASH: {e}")
+            error_msg = str(e)
+
+            # 🚑 MT5 Relaunch Protocol
+            if "'NoneType' object is not iterable" in error_msg:
+                print(f"🚑 MT5 RECOVERY: {error_msg}")
+                tg_bot.send_msg(f"🚨 {BOT_IDENTITY.capitalize()} MT5 Connection Lost. Attempting to relaunch terminal...")
+
+                # Disconnect before relaunch
+                my_broker.shutdown()
+
+                # The startup method already handles launching the terminal
+                if my_broker.startup():
+                    next_mt5_retry_at = 0
+                    tg_bot.send_msg("✅ MT5 Reconnected.")
+                else:
+                    tg_bot.send_msg("❌ MT5 Relaunch FAILED. Check file path. Retrying connection in 5 mins.")
+                    next_mt5_retry_at = time.time() + MT5_RETRY_INTERVAL
+            else:
+                # Standard crash report
+                print(f"📉 CRITICAL CRASH: {error_msg}")
+                tg_bot.send_msg(f"📉 CRITICAL CRASH: {e}")
+
             time.sleep(10) # Pause for 10s to avoid spamming the logs if it's a persistent error
 
 if __name__ == "__main__":

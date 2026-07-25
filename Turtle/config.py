@@ -7,15 +7,17 @@ from dotenv import load_dotenv
 # ------------------------------------------------------------------------------
 # 🔐 LOAD SECRETS (ENV)
 # ------------------------------------------------------------------------------
-# Explicitly load the .env file located next to this config file (Turtle/.env)
+# Load the .env file located next to this config file (Turtle/.env).
+# Use override=True so the local .env takes precedence over any existing
+# environment variables (fixes stale system-level MT5_LOGIN like the old account).
 dotenv_path = Path(__file__).resolve().with_name('.env')
 load_dotenv(dotenv_path=dotenv_path, override=True)
 
-# Debug: show effective MT5_LOGIN loaded for this bot
+# Debug: show which .env was loaded and effective MT5_LOGIN (helps trace old-account issues)
 try:
-    _dbg = os.getenv('MT5_LOGIN')
-    if _dbg:
-        print(f"   🧭 Turtle config: loaded .env from {dotenv_path} -> MT5_LOGIN={_dbg}")
+    _dbg_login = os.getenv('MT5_LOGIN')
+    if _dbg_login:
+        print(f"   🧭 Turtle config: loaded .env from {dotenv_path} -> MT5_LOGIN={_dbg_login}")
 except Exception:
     pass
 
@@ -64,7 +66,8 @@ orbit_keys = os.getenv("GEMINI_API_KEYS_LIST")
 if orbit_keys:
     try:
         GEMINI_API_KEYS = json.loads(orbit_keys)
-    except:
+    except Exception:
+        # If parsing fails, accept a simple comma-separated list
         GEMINI_API_KEYS = [k.strip() for k in orbit_keys.split(',') if k.strip()]
 
 # 2. Look for individual keys (Darwin Classic Style)

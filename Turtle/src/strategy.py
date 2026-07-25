@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- AI STRATEGY ENGINE v2.3 (Lite Edition) ----
+# ---- AI STRATEGY ENGINE v3.0 (Autonomous Edition) ----
 # ==============================================================================
 
 import pandas as pd
@@ -10,24 +10,6 @@ import sys
 from datetime import datetime
 
 # ==============================================================================
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -85,12 +67,13 @@ STRATEGY_STATE = {
         "BOL_STD_DEV": 2.0
     },
     "BENCHED_PAIRS": {
-        "USDJPY": "2026-07-04 20:37:47",
-        "EURGBP": "2026-07-04 20:37:47",
-        "EURJPY": "2026-07-04 20:37:47",
-        "CADJPY": "2026-07-04 20:37:47",
-        "GBPJPY": "2026-07-04 20:37:47",
-        "AUDJPY": "2026-07-04 20:37:47"
+        "USDJPY": "2026-07-25 19:50:00",
+        "AUDNZD": "2026-07-25 19:50:00",
+        "EURJPY": "2026-07-25 19:50:00",
+        "CADJPY": "2026-07-25 19:50:00",
+        "GBPJPY": "2026-07-25 19:50:00",
+        "CHFJPY": "2026-07-25 19:50:00",
+        "AUDJPY": "2026-07-25 19:50:00"
     },
     "MODE": "STANDARD"
 }
@@ -100,7 +83,7 @@ STRATEGY_STATE = {
 
 class Strategy:
     """
-    Turtle v2.1 🧬
+    AI Strategy Engine 🧬
     """
     def __init__(self):
         # Initial Load
@@ -108,7 +91,7 @@ class Strategy:
         self.update_name()
 
     def update_name(self):
-        # 📝 CHANGE: Removed "Turtle v2.1" prefix. Now it's just the ingredients joined by '+'.
+        # 📝 CHANGE: Removed prefix. Now it's just the ingredients joined by '+'.
         # Example: "EMA+MACD+Bol" (12 chars) -> Fits easily in MT5.
         self.name = "+".join(self.state['ACTIVE_CONCOCTION'])
 

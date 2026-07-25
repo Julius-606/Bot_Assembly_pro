@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- AI STRATEGY ENGINE v2.3 (Lite Edition) ----
+# ---- AI STRATEGY ENGINE v3.0 (Autonomous Edition) ----
 # ==============================================================================
 
 import pandas as pd
@@ -10,8 +10,6 @@ import sys
 from datetime import datetime
 
 # ==============================================================================
-
-
 
 
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
@@ -85,7 +83,7 @@ STRATEGY_STATE = {
 
 class Strategy:
     """
-    Darwin v2.1 🧬
+    AI Strategy Engine 🧬
     """
     def __init__(self):
         # Initial Load
@@ -93,7 +91,7 @@ class Strategy:
         self.update_name()
 
     def update_name(self):
-        # 📝 CHANGE: Removed "Darwin v3.1" prefix. Now it's just the ingredients joined by '+'.
+        # 📝 CHANGE: Removed prefix. Now it's just the ingredients joined by '+'.
         # Example: "EMA+MACD+Bol" (12 chars) -> Fits easily in MT5.
         self.name = "+".join(self.state['ACTIVE_CONCOCTION'])
 

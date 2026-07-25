@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- AI STRATEGY ENGINE v2.3 (Lite Edition) ----
+# ---- AI STRATEGY ENGINE v3.0 (Autonomous Edition) ----
 # ==============================================================================
 
 import pandas as pd
@@ -46,7 +46,21 @@ STRATEGY_STATE = {
         "BOL_DEVIATIONS": 2.0,
         "ATR_PERIOD": 20,
         "ATR_MULTIPLIER": 2.0,
-        "RISK_REWARD": 2.0
+        "RISK_REWARD": 2.0,
+        "EMA_FAST": 9,
+        "EMA_SLOW": 21,
+        "RSI_PERIOD": 14,
+        "RSI_LIMIT_LOW": 30,
+        "RSI_LIMIT_HIGH": 70,
+        "ADX_THRESHOLD": 25,
+        "DONCHIAN_PERIOD": 20,
+        "KELTNER_MULT": 2.0,
+        "FIB_LOOKBACK": 50,
+        "SMA_PERIOD": 200,
+        "WILLIAMS_PERIOD": 14,
+        "MFI_PERIOD": 14,
+        "ROC_PERIOD": 12,
+        "TRIX_PERIOD": 15
     },
     "BENCHED_PAIRS": {
         "USDJPY": "2026-05-27 22:57:11"
@@ -59,7 +73,7 @@ STRATEGY_STATE = {
 
 class Strategy:
     """
-    Darwin v2.1 🧬
+    AI Strategy Engine 🧬
     """
     def __init__(self):
         # Initial Load
@@ -67,7 +81,7 @@ class Strategy:
         self.update_name()
 
     def update_name(self):
-        # 📝 CHANGE: Removed "Darwin v3.1" prefix. Now it's just the ingredients joined by '+'.
+        # 📝 CHANGE: Removed prefix. Now it's just the ingredients joined by '+'.
         # Example: "EMA+MACD+Bol" (12 chars) -> Fits easily in MT5.
         self.name = "+".join(self.state['ACTIVE_CONCOCTION'])
 

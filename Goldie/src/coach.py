@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from src.cloud import CloudManager
 from src.telegram_bot import TelegramBot
 import src.strategy as strategy_module 
-from config import GEMINI_API_KEYS # 🛠️ Import List, not single key
+from config import GEMINI_API_KEYS, WORKSHEET_LOGS, BOT_IDENTITY # 🛠️ Optimized Imports
 
 # 🔇 SILENCE THE GOOGLE WARNING
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -30,7 +30,7 @@ class Coach:
     and adjusts the playbook (strategy.py) using AI.
     """
     def __init__(self):
-        print("🧢 Coach: Initializing...")
+        print(f"   🧢 Coach ({BOT_IDENTITY.capitalize()}): Initializing...")
         self.cloud = CloudManager()
         self.bot = TelegramBot()
         
@@ -115,7 +115,7 @@ class Coach:
                 triggers = ["429", "quota", "resource", "key not valid", "400", "403"]
                 
                 if any(x in error_str for x in triggers):
-                    print(f"   ⚠️ Key Issue (#{self.current_key_index + 1}).")
+                    print(f"   ⚠️ Key Issue Issue (#{self.current_key_index + 1}).")
                     print(f"      ↳ Reason: {e}") # <--- 🗣️ THE SNITCH
                     print("      ↳ Rotating...")
                     
@@ -130,6 +130,83 @@ class Coach:
         print("   💀 All API Keys exhausted. AI unavailable.")
         self.bot.send_msg("💀 FATAL: All AI Keys have failed.")
         return None
+
+    def _clean_response_text(self, text):
+        return text.replace("```json", "").replace("```", "").strip()
+
+    def _parse_oracle_response(self, response_text):
+        try:
+            payload = json.loads(self._clean_response_text(response_text))
+        except Exception:
+            return None, None, None
+
+        explanation = ""
+        highlights = None
+
+        if isinstance(payload, dict) and isinstance(payload.get("strategy_state"), dict):
+            strategy_state = payload["strategy_state"]
+            explanation = payload.get("explanation", "")
+            highlights = payload.get("parameter_highlights")
+            return strategy_state, explanation, highlights
+
+        if isinstance(payload, dict) and "ACTIVE_CONCOCTION" in payload and "PARAMS" in payload:
+            explanation = payload.get("explanation", "")
+            highlights = payload.get("parameter_highlights")
+            return payload, explanation, highlights
+
+        return None, None, None
+
+    def _format_parameter_highlights(self, previous_state, new_state, highlights):
+        if isinstance(highlights, list):
+            lines = [f"   - {str(item)}" for item in highlights if str(item).strip()]
+            if lines:
+                return "\n".join(lines)
+
+        if isinstance(highlights, dict):
+            lines = [f"   - {key}: {value}" for key, value in highlights.items()]
+            if lines:
+                return "\n".join(lines)
+
+        if isinstance(highlights, str) and highlights.strip():
+            return f"   - {highlights.strip()}"
+
+        previous_params = (previous_state or {}).get("PARAMS", {})
+        new_params = (new_state or {}).get("PARAMS", {})
+        diff_lines = []
+
+        if previous_state and previous_state.get("ACTIVE_CONCOCTION") != new_state.get("ACTIVE_CONCOCTION"):
+            diff_lines.append(
+                f"   - ACTIVE_CONCOCTION: {previous_state.get('ACTIVE_CONCOCTION')} -> {new_state.get('ACTIVE_CONCOCTION')}"
+            )
+
+        for key in sorted(set(previous_params) | set(new_params)):
+            if previous_params.get(key) != new_params.get(key):
+                diff_lines.append(f"   - {key}: {previous_params.get(key)} -> {new_params.get(key)}")
+
+        return "\n".join(diff_lines) if diff_lines else "   - No parameter changes reported."
+
+    def _brief_reasoning(self, explanation):
+        if not explanation:
+            return ""
+
+        text = " ".join(str(explanation).split()).strip()
+        if len(text) > 140:
+            text = text[:137].rstrip() + "..."
+        return text
+
+    def _build_update_message(self, header, previous_state, new_state, explanation, highlights):
+        recipe = new_state.get("ACTIVE_CONCOCTION", [])
+        message_lines = [header, f"🆕 New Recipe: {recipe}"]
+
+        brief_reasoning = self._brief_reasoning(explanation)
+        if brief_reasoning:
+            message_lines.append(f"🧠 Reasoning: {brief_reasoning}")
+
+        highlight_block = self._format_parameter_highlights(previous_state, new_state, highlights)
+        if highlight_block:
+            message_lines.append(f"⚙️ Parameter Highlights:\n{highlight_block}")
+
+        return "\n".join(message_lines)
 
     def _resolve_model_name(self):
         """
@@ -180,7 +257,7 @@ class Coach:
         try:
             # We use the CloudManager's existing auth to get the sheet
             sheet = self.cloud.sheets_client.open_by_url(self.cloud.sheet_url) 
-            ws = sheet.worksheet("Sheet5")
+            ws = sheet.worksheet(WORKSHEET_LOGS)
             data = ws.get_all_records()
             df = pd.DataFrame(data)
             return df
@@ -283,7 +360,7 @@ class Coach:
         gross_loss = abs(recent_30[recent_30['PnL'] < 0]['PnL'].sum())
         profit_factor = f"{gross_profit / gross_loss:.4f}" if gross_loss != 0 else "∞"
         
-        return (f"🧢 COACH DIAGNOSTICS\n"
+        return (f"   🧢 COACH DIAGNOSTICS\n"
                 f"🧠 AI Brain: {ai_status}\n"
                 f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                 f"📊 Batch Progress: {remainder}/20 collected\n"
@@ -388,20 +465,26 @@ class Coach:
         CURRENT STRATEGY STATE: {current_strategy}
         PROBLEM: Bot has been silent for {int(hours)} hours.
         TASK: Adjust 'PARAMS' to be MORE AGGRESSIVE/SENSITIVE to find entries.
-        RESPONSE FORMAT: JSON ONLY of the new STRATEGY_STATE.
+        RESPONSE FORMAT: JSON ONLY with 'strategy_state', 'explanation', and 'parameter_highlights'.
         """
         
         response = self._generate_safe(prompt)
         if not response: return
 
         try:
-            raw_text = response.text.replace("```json", "").replace("```", "").strip()
-            new_state = json.loads(raw_text)
-            
-            if "ACTIVE_CONCOCTION" in new_state and "PARAMS" in new_state:
+            new_state, explanation, highlights = self._parse_oracle_response(response.text)
+
+            if new_state and "ACTIVE_CONCOCTION" in new_state and "PARAMS" in new_state:
                 print("   🧢 Oracle has updated parameters for activity.")
                 self._update_strategy_file(new_state)
-                self.bot.send_msg(f"✅ ADJUSTMENT APPLIED\nSettings loosened to find more trades.")
+                update_msg = self._build_update_message(
+                    "✅ ADJUSTMENT APPLIED",
+                    state,
+                    new_state,
+                    explanation,
+                    highlights,
+                )
+                self.bot.send_msg(update_msg)
         except Exception as e:
             print(f"   ❌ Silence Fix Failed: {e}")
 
@@ -463,27 +546,34 @@ class Coach:
 
         prompt = f"""
         You are an expert Forex Algorithmic Trading Coach.
+        BOT CONTEXT: {BOT_IDENTITY.capitalize()} manages live trades, and TP_CHASE can cause repeated SL_HIT rows in Sheets.
         CURRENT STRATEGY STATE: {current_strategy}
         RECENT HISTORY: {recent_history_json}
         CONTROL MODE: {AI_CONTROL_MODE}
         
         {task_instruction}
         
-        RESPONSE FORMAT: JSON ONLY of the new STRATEGY_STATE.
+        RESPONSE FORMAT: JSON ONLY with 'strategy_state', 'explanation', and 'parameter_highlights'.
+            Keep 'explanation' brief and practical: 3 sentence max.
         """
         
         response = self._generate_safe(prompt)
         if not response: return
         
         try:
-            raw_text = response.text.replace("```json", "").replace("```", "").strip()
-            new_state = json.loads(raw_text)
-            
-            if "ACTIVE_CONCOCTION" in new_state and "PARAMS" in new_state:
+            new_state, explanation, highlights = self._parse_oracle_response(response.text)
+
+            if new_state and "ACTIVE_CONCOCTION" in new_state and "PARAMS" in new_state:
                 print("   🧢 Oracle has spoken. Applying updates...")
                 self._update_strategy_file(new_state)
-                new_recipe = new_state['ACTIVE_CONCOCTION']
-                self.bot.send_msg(f"🧢 ORACLE UPDATE APPLIED\n🆕 New Recipe: {new_recipe}\n🧠 Strategy optimized.")
+                update_msg = self._build_update_message(
+                    "   🧢 ORACLE UPDATE APPLIED",
+                    state,
+                    new_state,
+                    explanation,
+                    highlights,
+                )
+                self.bot.send_msg(update_msg)
             else:
                 self.bot.send_msg("⚠️ AI Error: Invalid JSON response.")
         except Exception as e:
@@ -513,7 +603,10 @@ class Coach:
                 f.write(new_content)
                 
             print("   ✅ strategy.py successfully updated.")
-            
+            self.cloud.load_memory()
+            self.cloud.state['ai_change_pending'] = True
+            self.cloud.save_memory()
+
         except Exception as e:
             print(f"   ❌ Failed to update strategy file: {e}")
             self.bot.send_msg(f"⚠️ COACH ERROR: Failed to write to file.\n{e}")

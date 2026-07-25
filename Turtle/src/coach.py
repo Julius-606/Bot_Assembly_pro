@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from src.cloud import CloudManager
 from src.telegram_bot import TelegramBot
 import src.strategy as strategy_module 
-from config import GEMINI_API_KEYS # 🛠️ Import List, not single key
+from config import GEMINI_API_KEYS, WORKSHEET_LOGS, BOT_IDENTITY # 🛠️ Optimized Imports
 
 # 🔇 SILENCE THE GOOGLE WARNING
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -20,7 +20,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # ==============================================================================
 # 'FIXED' -> AI CANNOT change 'ACTIVE_CONCOCTION' (Ingredients). Only tunes 'PARAMS'.
 # 'FREE'  -> AI has full control to change 'ACTIVE_CONCOCTION' and 'PARAMS'.
-AI_CONTROL_MODE = "FIXED" 
+AI_CONTROL_MODE = "FREE"  # Options: 'FIXED', 'FREE'
 # ==============================================================================
 
 class Coach:
@@ -30,7 +30,7 @@ class Coach:
     and adjusts the playbook (strategy.py) using AI.
     """
     def __init__(self):
-        print("🧢 Coach: Initializing...")
+        print(f"   🧢 Coach ({BOT_IDENTITY.capitalize()}): Initializing...")
         self.cloud = CloudManager()
         self.bot = TelegramBot()
         
@@ -257,7 +257,7 @@ class Coach:
         try:
             # We use the CloudManager's existing auth to get the sheet
             sheet = self.cloud.sheets_client.open_by_url(self.cloud.sheet_url) 
-            ws = sheet.worksheet("Sheet2")
+            ws = sheet.worksheet(WORKSHEET_LOGS)
             data = ws.get_all_records()
             df = pd.DataFrame(data)
             return df
@@ -360,7 +360,7 @@ class Coach:
         gross_loss = abs(recent_30[recent_30['PnL'] < 0]['PnL'].sum())
         profit_factor = f"{gross_profit / gross_loss:.4f}" if gross_loss != 0 else "∞"
         
-        return (f"🧢 COACH DIAGNOSTICS\n"
+        return (f"   🧢 COACH DIAGNOSTICS\n"
                 f"🧠 AI Brain: {ai_status}\n"
                 f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                 f"📊 Batch Progress: {remainder}/20 collected\n"
@@ -512,10 +512,10 @@ class Coach:
         active_concoction = state.get("ACTIVE_CONCOCTION", [])
         
         report_msg = (
-            f"🧢 COACH BATCH REPORT ({total_closed} Trades)\n"
-            f"💰 Batch PnL: ${total_pnl:.2f}\n"
-            f"🏆 Win Rate: {int(win_rate*100)}%\n"
-            f"🧪 Recipe: {active_concoction}\n"
+            f"   🧢 COACH BATCH REPORT ({total_closed} Trades)\n"
+            f"   💰 Batch PnL: ${total_pnl:.2f}\n"
+            f"   🏆 Win Rate: {int(win_rate*100)}%\n"
+            f"   🧪 Recipe: {active_concoction}\n"
         )
 
         if not ai_assist_needed:
@@ -546,7 +546,7 @@ class Coach:
 
         prompt = f"""
         You are an expert Forex Algorithmic Trading Coach.
-        BOT CONTEXT: Turtle manages live trades, and TP_CHASE can cause repeated SL_HIT rows in Sheets.
+        BOT CONTEXT: {BOT_IDENTITY.capitalize()} manages live trades, and TP_CHASE can cause repeated SL_HIT rows in Sheets.
         CURRENT STRATEGY STATE: {current_strategy}
         RECENT HISTORY: {recent_history_json}
         CONTROL MODE: {AI_CONTROL_MODE}
@@ -567,7 +567,7 @@ class Coach:
                 print("   🧢 Oracle has spoken. Applying updates...")
                 self._update_strategy_file(new_state)
                 update_msg = self._build_update_message(
-                    "🧢 ORACLE UPDATE APPLIED",
+                    "   🧢 ORACLE UPDATE APPLIED",
                     state,
                     new_state,
                     explanation,

@@ -17,18 +17,24 @@ class BrokerAPI:
 
     def startup(self):
         print(f"   🕵️  Scanning for MT5...")
-        
-        # 1. ATTEMPT NORMAL CONNECTION
-        if self._try_connect():
-            return True
-        
-        # 2. IF FAILED, DEPLOY THE BATTERING RAM
-        print("   ⚠️ Standard connection failed. Deploying HEADLESS BOOTLOADER...")
-        if self._force_launch_mt5():
-            print("   ⏳ Waiting for Headless MT5 to stabilize...")
-            time.sleep(15) # Give it time to log in
-            return self._try_connect()
-            
+        self.connected = False
+
+        # Try a few times so a closed terminal gets relaunched automatically.
+        for attempt in range(1, 4):
+            if self._try_connect():
+                return True
+
+            print(f"   ⚠️ MT5 connection failed (attempt {attempt}/3).")
+
+            # If the terminal is closed or not responding, relaunch it before retrying.
+            if self._force_launch_mt5():
+                print("   ⏳ Waiting for MT5 to stabilize...")
+                time.sleep(15)
+                continue
+
+            # If we could not launch it, avoid tight looping and retry the connect path once more.
+            time.sleep(5)
+
         return False
 
     def _try_connect(self):
@@ -36,12 +42,14 @@ class BrokerAPI:
         try:
             # We use the path specifically
             if not mt5.initialize(path=MT5_PATH, timeout=20000): # 20s timeout
+                self.connected = False
                 return False
             
             # Login Check
             print(f"   🔑 Authenticating with account {MT5_LOGIN}...")
             if not mt5.login(login=MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER):
                 print(f"   ❌ Login Failed: {mt5.last_error()}")
+                self.connected = False
                 return False
             
             self.connected = True
@@ -49,16 +57,29 @@ class BrokerAPI:
             return True
         except Exception as e:
             print(f"   ❌ Connection Error: {e}")
+            self.connected = False
             return False
 
     def _force_launch_mt5(self):
         """Launches MT5 if it's not running (Linux/Wine friendly)"""
         try:
+            try:
+                mt5.shutdown()
+            except Exception:
+                pass
+
             subprocess.Popen(MT5_PATH)
             return True
         except Exception as e:
             print(f"   ❌ Failed to launch MT5: {e}")
             return False
+
+    def shutdown(self):
+        """Disconnects from MT5."""
+        if self.connected:
+            mt5.shutdown()
+            self.connected = False
+            print("   🔌 Disconnected from MT5.")
 
     def get_data(self, symbol, timeframe, n=200):
         if not self.connected: return None
