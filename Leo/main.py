@@ -1,5 +1,5 @@
 # ==============================================================================
-# ---- Darwin Main v3.0.0 (Autonomy Update) ----
+# ---- Leo Main v4.0.0 (Executioner Update) ----
 # ==============================================================================
 import sys
 import os
@@ -68,8 +68,9 @@ def sync_balance(broker, cloud):
 def manage_running_trades(broker, cloud, tg_bot):
     """
     🏃‍♂️ The Trailer.
-    1. Moves SL to break-even and trails profit (Locks in gains).
-    2. Moves TP AWAY from price (Infinite upside).
+    1. Partial Close at Initial TP (Take Half).
+    2. Moves SL to break-even and trails profit (Locks in gains).
+    3. Moves TP AWAY from price (Infinite upside).
     """
     if not broker.connected: return
     
@@ -81,6 +82,9 @@ def manage_running_trades(broker, cloud, tg_bot):
     positions = broker.get_open_positions()
     if not positions: return
 
+    # Track partial closes in memory
+    partial_closed = cloud.state.get('partial_closed_tickets', [])
+
     for pos in positions:
         symbol = pos.symbol
         ticket = pos.ticket
@@ -90,11 +94,31 @@ def manage_running_trades(broker, cloud, tg_bot):
         tp = pos.tp
         type_op = pos.type # 0=Buy, 1=Sell
         
+        # Get memory trade data for initial TP
+        memory_trades = cloud.state.get('open_bot_trades', [])
+        trade_data = next((t for t in memory_trades if t['ticket'] == ticket), None)
+        initial_tp = trade_data.get('initial_tp') if trade_data else None
+
         # Determine Point Size (e.g. 0.00001 or 0.01)
         symbol_info = mt5.symbol_info(symbol)
         if not symbol_info: continue
         point = symbol_info.point
         
+        # ✂️ PARTIAL CLOSE LOGIC (TAKE HALF)
+        if initial_tp and ticket not in partial_closed:
+            reached = False
+            if type_op == 0 and price_current >= initial_tp: reached = True
+            elif type_op == 1 and price_current <= initial_tp: reached = True
+
+            if reached:
+                vol_to_close = round(pos.volume / 2, 2)
+                if vol_to_close >= symbol_info.volume_min:
+                    if broker.partial_close(ticket, symbol, vol_to_close, type_op == 0):
+                        tg_bot.send_msg(f"✂️ PARTIAL CLOSE: {symbol} half closed at {initial_tp} (Locked PnL)")
+                        partial_closed.append(ticket)
+                        cloud.state['partial_closed_tickets'] = partial_closed
+                        cloud.save_memory()
+
         # CONFIGS (Converted from 'points' to real price delta)
         activation_dist = TRAILING_CONFIG['sl_activation_distance'] * point
         trail_dist = TRAILING_CONFIG['sl_distance'] * point
@@ -267,7 +291,7 @@ def check_weekend_chill(broker, cloud, tg_bot):
     return False
 
 def main():
-    print(f"🚀 INITIALIZING {BOT_IDENTITY.upper()} V3.0.0 (Autonomy Update)...")
+    print(f"🚀 INITIALIZING {BOT_IDENTITY.upper()} V4.0.0 (Executioner Update)...")
     print(f"   🛡️ Risk Guard: Max {MAX_OPEN_TRADES} Trades | Lots: Fixed (Config)")
     print(f"   👮 Risk Police: Max Loss capped at {MAX_RISK_PCT*100}% per trade")
     print(f"   🚫 Strict Mode: NO METALS or CRYPTO Allowed.")
@@ -456,7 +480,7 @@ def main():
             # If a trade closed, we wake up the Coach immediately 🧢
             if audit_trades(my_broker, my_cloud, tg_bot):
                 print("   🧢 Trade Closed. Waking up the Coach...")
-                my_coach.consult_oracle()
+                my_coach.consult_oracle(broker=my_broker)
             
             # --- 🗣️ SILENCE CHECK ---
             # If it's been an hour since last check, see if the bot is dead silent
@@ -592,6 +616,7 @@ def main():
                                 'entry_price': result.price,
                                 'stop_loss_price': sl,
                                 'take_profit_price': tp,
+                                'initial_tp': tp, # 🆕 Track for Partial Close
                                 'volume': volume,
                                 'spread': spread_at_open, # 📝 Log Spread here
                                 'exit_price': 0,

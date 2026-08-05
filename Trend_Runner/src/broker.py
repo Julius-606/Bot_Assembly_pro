@@ -245,6 +245,38 @@ class BrokerAPI:
         if result is None: return False
         return result.retcode == mt5.TRADE_RETCODE_DONE
 
+    def partial_close(self, ticket, symbol, volume_to_close, is_long):
+        """Closes a specific portion of a position."""
+        if not self.connected: return False
+
+        type_op = mt5.ORDER_TYPE_SELL if is_long else mt5.ORDER_TYPE_BUY
+        tick = mt5.symbol_info_tick(symbol)
+        price = tick.bid if is_long else tick.ask
+        fill_mode = self.get_filling_mode(symbol)
+
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "position": int(ticket),
+            "symbol": symbol,
+            "volume": float(volume_to_close),
+            "type": type_op,
+            "price": float(price),
+            "deviation": 20,
+            "magic": 234000,
+            "comment": "Partial Close",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": fill_mode,
+        }
+
+        result = mt5.order_send(request)
+        if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+            print(f"   ✂️ Partial Close Successful for {symbol} ({volume_to_close} lots)")
+            return True
+
+        err = mt5.last_error()
+        print(f"   ❌ Partial Close Failed: {result.comment if result else 'No Result'} (MT5 Error: {err})")
+        return False
+
     def check_trade_status(self, ticket):
         positions = mt5.positions_get(ticket=int(ticket))
         if positions: return {'status': 'open'}

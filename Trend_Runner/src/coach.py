@@ -52,6 +52,16 @@ class Coach:
         # 🛑 STRICT FILTER: Only look at these rows for analysis
         self.VALID_EXIT_REASONS = ['CLOSED_BY_BROKER', 'TP_HIT', 'SL_HIT', 'FRIDAY_CLOSE', 'MANUAL_CLOSE']
 
+        # 🆕 v4.0.0 CACHE (API Quota Management)
+        self.tape_cache = None
+        self.tape_timestamp = 0
+        self.cache_duration = 300 # 5 Minutes
+
+        # 🆕 v4.0.0 CACHE (API Quota Management)
+        self.tape_cache = None
+        self.tape_timestamp = 0
+        self.cache_duration = 300 # 5 Minutes
+
     def _initialize_ai(self):
         """Sets up the generative model with the current key."""
         try:
@@ -245,14 +255,24 @@ class Coach:
             return strategy_module.STRATEGY_STATE
 
     def fetch_game_tape(self):
-        """Reads trade history from Google Sheets via CloudManager."""
-        print("   🧢 Coach: Reading Game Tape...")
+        """Reads trade history from Google Sheets via CloudManager (with Caching)."""
+        now = time.time()
+        if self.tape_cache is not None and (now - self.tape_timestamp) < self.cache_duration:
+            # print("   🧢 Coach: Using cached Game Tape.")
+            return self.tape_cache
+
+        print("   🧢 Coach: Reading fresh Game Tape...")
         try:
             # We use the CloudManager's existing auth to get the sheet
             sheet = self.cloud.sheets_client.open_by_url(self.cloud.sheet_url) 
             ws = sheet.worksheet(WORKSHEET_LOGS)
             data = ws.get_all_records()
             df = pd.DataFrame(data)
+
+            # Update Cache
+            self.tape_cache = df
+            self.tape_timestamp = now
+
             return df
         except Exception as e:
             print(f"   ❌ Coach Error: Could not read sheets. {e}")
@@ -352,12 +372,18 @@ class Coach:
         trades_needed = 20 - remainder
         recent_30 = closed.tail(30)
         total_30 = len(recent_30)
-        wins = len(recent_30[recent_30['PnL'] > 0])
-        win_rate = (wins / total_30 * 100) if total_30 > 0 else 0
-        gross_profit = recent_30[recent_30['PnL'] > 0]['PnL'].sum()
-        gross_loss = abs(recent_30[recent_30['PnL'] < 0]['PnL'].sum())
-        profit_factor = f"{gross_profit / gross_loss:.4f}" if gross_loss != 0 else "∞"
+
+        wins_df = recent_30[recent_30['PnL'] > 0]
+        losses_df = recent_30[recent_30['PnL'] < 0]
+
+        win_rate = (len(wins_df) / total_30 * 100) if total_30 > 0 else 0
+        avg_win = wins_df['PnL'].mean() if not wins_df.empty else 0
+        avg_loss = abs(losses_df['PnL'].mean()) if not losses_df.empty else 0
         
+        profit_factor = (wins_df['PnL'].sum() / abs(losses_df['PnL'].sum())) if not losses_df.empty else float('inf')
+        expectancy = (win_rate/100 * avg_win) - ((1 - win_rate/100) * avg_loss)
+        rr_ratio = (avg_win / avg_loss) if avg_loss else 0
+
         return (f"   🧢 COACH DIAGNOSTICS\n"
                 f"   🧠 AI Brain: {ai_status}\n"
                 f"   📊 Batch Progress: {remainder}/20 collected\n"
@@ -366,33 +392,27 @@ class Coach:
                 f"   -----------------------------\n"
                 f"   📉 LAST 30 TRADES SNAPSHOT\n"
                 f"   🏆 Win Rate: {win_rate:.2f}%\n"
-                f"   ⚖️ Profit Factor: {profit_factor}\n"
+                f"   💰 Expectancy: ${expectancy:.2f}/trade\n"
+                f"   📈 Avg Win: ${avg_win:.2f} | 📉 Avg Loss: ${avg_loss:.2f}\n"
+                f"   ⚖️ RR Ratio: 1:{rr_ratio:.2f}\n"
                 f"   {bench_msg}")
 
     def check_pairs(self, df):
         """Checks for toxic pairs and updates strategy file."""
         # 🕒 SORTING FIX: Ensure we are analyzing the LATEST trades
-        # Try to find a column that looks like Time or Date
         time_col = next((c for c in df.columns if c.lower() in ['close time', 'time', 'date', 'close_time', 'exit time']), None)
         
         if time_col:
             try:
-                # Convert to datetime and sort ascending (old -> new)
                 df[time_col] = pd.to_datetime(df[time_col], errors='coerce')
                 df = df.sort_values(by=time_col)
-                # print(f"   📅 Coach: Sorted history by {time_col} to find latest data.")
-            except Exception as e:
-                # print(f"   ⚠️ Coach Sorting Warning: {e}. Using sheet order.")
-                pass
+            except: pass
         
         pairs = df['Pair'].unique()
         state = self.get_current_strategy_state()
         current_benched = state.get("BENCHED_PAIRS", {})
-        
-        # AMNESIA FIX: Track when benches were lifted
         lifted_at = self.cloud.state.get('lifted_at', {})
         dirty_cloud = False
-
         dirty = False
         new_bench_state = current_benched.copy()
 
@@ -416,13 +436,23 @@ class Coach:
             if pair in new_bench_state: continue
 
             pair_df = df[df['Pair'] == pair]
-
-            # AMNESIA FIX: Filter out trades seen BEFORE the last lift
             if pair in lifted_at and time_col:
                 last_lift = pd.to_datetime(lifted_at[pair])
                 pair_df = pair_df[pair_df[time_col] > last_lift]
 
-            # .tail() now explicitly grabs the NEWEST rows because we sorted above
+            # 🪓 THE GUILLOTINE: 3 consecutive losses in 24h
+            recent_3 = pair_df.tail(3)
+            if len(recent_3) == 3 and (recent_3['PnL'] <= 0).all():
+                if time_col:
+                    last_3_start = recent_3[time_col].min()
+                    if (now - last_3_start).total_seconds() < 86400:
+                        lift_time = now + timedelta(hours=24)
+                        new_bench_state[pair] = lift_time.strftime("%Y-%m-%d %H:%M:%S")
+                        self.bot.send_msg(f"🪓 GUILLOTINE: {pair} benched for 24h (3 consecutive losses).")
+                        dirty = True
+                        continue
+
+            # Standard Win Rate Bench
             pair_data = pair_df.tail(self.lookback_trades)
             if len(pair_data) < 3: continue 
             
@@ -434,7 +464,7 @@ class Coach:
                 lift_time = now + timedelta(hours=self.bench_duration)
                 lift_str = lift_time.strftime("%Y-%m-%d %H:%M:%S")
                 print(f"   🚨 BENCHING {pair} (WinRate: {win_rate:.2f}).")
-                self.bot.send_msg(f"🧢 COACH INTERVENTION\n🚫 Benching {pair}\n📉 WR: {int(win_rate*100)}% ({wins}/{total})\n⏳ Until: {lift_str}")
+                self.bot.send_msg(f"   🧢 COACH INTERVENTION\n🚫 Benching {pair}\n📉 WR: {int(win_rate*100)}% ({wins}/{total})\n⏳ Until: {lift_str}")
                 new_bench_state[pair] = lift_str
                 dirty = True
 
@@ -502,13 +532,13 @@ class Coach:
         except Exception as e:
             print(f"   ❌ Silence Fix Failed: {e}")
 
-    def consult_oracle(self, force=False):
+    def consult_oracle(self, force=False, broker=None):
         """The AI Brain with Key Rotation."""
         if not self.cloud.state.get('ai_consultation_enabled', True):
             if force: self.bot.send_msg("🛑 Gemini Consultation is DISABLED.")
             return
 
-        closed_df = self.audit_performance()
+        closed_df = self.audit_performance(broker=broker)
         if closed_df is None or closed_df.empty: 
             if force: self.bot.send_msg("⚠️ Consult failed: No closed trades found to analyze.")
             return

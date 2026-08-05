@@ -42,7 +42,8 @@ class CloudManager:
             "trailing_enabled": True,
             "ai_consultation_enabled": True,
             "manually_benched_pairs": [],
-            "lifted_at": {}
+            "lifted_at": {},
+            "partial_closed_tickets": []
         }
         
         self.setup()
