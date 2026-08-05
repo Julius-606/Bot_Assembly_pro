@@ -13,6 +13,29 @@ from datetime import datetime
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -43,15 +66,15 @@ STRATEGY_STATE = {
         "MACD"
     ],
     "PARAMS": {
-        "EMA_FAST": 10,
-        "EMA_SLOW": 21,
+        "EMA_FAST": 12,
+        "EMA_SLOW": 26,
         "RSI_PERIOD": 14,
         "RSI_LIMIT_LOW": 20,
         "RSI_LIMIT_HIGH": 80,
         "ATR_PERIOD": 14,
         "ATR_MULTIPLIER": 4.0,
         "RISK_REWARD": 2.5,
-        "ADX_THRESHOLD": 25,
+        "ADX_THRESHOLD": 30,
         "DONCHIAN_PERIOD": 30,
         "KELTNER_MULT": 2.5,
         "FIB_LOOKBACK": 100,
@@ -67,13 +90,12 @@ STRATEGY_STATE = {
         "BOL_STD_DEV": 2.0
     },
     "BENCHED_PAIRS": {
-        "USDJPY": "2026-07-25 19:50:00",
-        "AUDNZD": "2026-07-25 19:50:00",
-        "EURJPY": "2026-07-25 19:50:00",
-        "CADJPY": "2026-07-25 19:50:00",
-        "GBPJPY": "2026-07-25 19:50:00",
-        "CHFJPY": "2026-07-25 19:50:00",
-        "AUDJPY": "2026-07-25 19:50:00"
+        "USDJPY": "2026-08-05 20:09:01",
+        "EURJPY": "2026-08-05 20:09:01",
+        "CADJPY": "2026-08-05 20:09:01",
+        "GBPJPY": "2026-08-05 20:09:01",
+        "CHFJPY": "2026-08-05 20:09:01",
+        "AUDJPY": "2026-08-05 20:09:01"
     },
     "MODE": "STANDARD"
 }

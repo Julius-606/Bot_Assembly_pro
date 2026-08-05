@@ -27,7 +27,8 @@ try:
     # Added MAX_RISK_PCT and BLACKLIST_ASSETS to import
     from config import (
         TRAILING_CONFIG, CRYPTO_MARKETS, MAX_OPEN_TRADES, DEFAULT_PARAMS,
-        MAX_RISK_PCT, BLACKLIST_ASSETS, MT5_PATH, BOT_IDENTITY, DEFAULT_STRATEGY
+        MAX_RISK_PCT, BLACKLIST_ASSETS, MT5_PATH, BOT_IDENTITY, DEFAULT_STRATEGY,
+        USER_DEFAULT_MARKETS
     )
     print("✅ The squad is assembled.")
 except ImportError as e:
@@ -72,6 +73,10 @@ def manage_running_trades(broker, cloud, tg_bot):
     """
     if not broker.connected: return
     
+    # 🛡️ TRAILING TOGGLE CHECK
+    if not cloud.state.get('trailing_enabled', True):
+        return
+
     # Get live positions
     positions = broker.get_open_positions()
     if not positions: return
@@ -115,8 +120,9 @@ def manage_running_trades(broker, cloud, tg_bot):
                         "tp": float(tp), # Keep existing TP for now
                         "magic": 234000
                     }
-                    mt5.order_send(request)
-                    # print(f"   🏃‍♂️ Trailed SL UP for {symbol}")
+                    res = mt5.order_send(request)
+                    if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                        cloud.update_trade(ticket, {"stop_loss_price": float(new_sl)})
 
             # B. TRAILING TAKE PROFIT (Offense - "You'll never catch me")
             # 🎣 CHASE: Moves TP further UP
@@ -135,6 +141,7 @@ def manage_running_trades(broker, cloud, tg_bot):
                 # 🛡️ THE FIX: Check res validity
                 if res and res.retcode == mt5.TRADE_RETCODE_DONE:
                     tg_bot.send_msg(f"🎣 TP CHASE: {symbol} extended to {new_tp}")
+                    cloud.update_trade(ticket, {"take_profit_price": float(new_tp)})
 
         # --- SELL LOGIC 📉 ---
         elif type_op == 1:
@@ -154,8 +161,9 @@ def manage_running_trades(broker, cloud, tg_bot):
                         "tp": float(tp),
                         "magic": 234000
                     }
-                    mt5.order_send(request)
-                    # print(f"   🏃‍♂️ Trailed SL DOWN for {symbol}")
+                    res = mt5.order_send(request)
+                    if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                        cloud.update_trade(ticket, {"stop_loss_price": float(new_sl)})
 
             # B. TRAILING TAKE PROFIT (Offense - "You'll never catch me")
             # 🎣 CHASE: Moves TP further DOWN
@@ -174,6 +182,7 @@ def manage_running_trades(broker, cloud, tg_bot):
                 # 🛡️ THE FIX: Check res validity
                 if res and res.retcode == mt5.TRADE_RETCODE_DONE:
                     tg_bot.send_msg(f"🎣 TP CHASE: {symbol} extended to {new_tp}")
+                    cloud.update_trade(ticket, {"take_profit_price": float(new_tp)})
 
 def audit_trades(broker, cloud, tg_bot):
     """
@@ -287,13 +296,18 @@ def main():
     silence_check_interval = 3600 # 1 Hour
 
     # 3. Main Loop
+    consecutive_errors = 0
     while True:
         try:
             my_cloud.load_memory()
             my_strategy.refresh_state()
 
             # Check for Telegram Commands
-            cmd = tg_bot.get_latest_command()
+            raw_cmd = tg_bot.get_latest_command()
+            cmd = None
+            cmd_args = []
+            if raw_cmd:
+                cmd, cmd_args = raw_cmd
             
             if cmd == "pause":
                 my_cloud.state['status'] = 'paused'
@@ -303,6 +317,41 @@ def main():
                 my_cloud.state['status'] = 'running'
                 tg_bot.send_msg(f"▶️ {BOT_IDENTITY.capitalize()} RESUMED. Hunting...")
                 my_cloud.save_memory()
+            elif cmd == "mode":
+                current_mode = my_cloud.state.get('mode', 'free')
+                new_mode = 'fixed' if current_mode == 'free' else 'free'
+                my_cloud.state['mode'] = new_mode
+                my_cloud.save_memory()
+                tg_bot.send_msg(f"🕹️ MODE SWITCH: {new_mode.upper()}")
+            elif cmd == "manage":
+                current_trail = my_cloud.state.get('trailing_enabled', True)
+                new_trail = not current_trail
+                my_cloud.state['trailing_enabled'] = new_trail
+                my_cloud.save_memory()
+                status = "ENABLED" if new_trail else "DISABLED"
+                tg_bot.send_msg(f"🏃‍♂️ TRAILING: {status}")
+            elif cmd == "gemini":
+                current_ai = my_cloud.state.get('ai_consultation_enabled', True)
+                new_ai = not current_ai
+                my_cloud.state['ai_consultation_enabled'] = new_ai
+                my_cloud.save_memory()
+                status = "ENABLED" if new_ai else "DISABLED"
+                tg_bot.send_msg(f"🤖 AI CONSULTATION: {status}")
+            elif cmd == "clear":
+                # 🧹 CLEAR COACH BENCHES
+                state = my_coach.get_current_strategy_state()
+                benched = state.get("BENCHED_PAIRS", {})
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                lifted_at = my_cloud.state.get('lifted_at', {})
+                for p in benched:
+                    lifted_at[p] = now_str
+
+                state["BENCHED_PAIRS"] = {}
+                my_coach._update_strategy_file(state)
+
+                my_cloud.state['lifted_at'] = lifted_at
+                my_cloud.save_memory()
+                tg_bot.send_msg("🧹 Coach benches cleared and memory reset!")
             elif cmd == "status":
                 bal = my_cloud.state.get('current_balance', 0)
                 active_count = len(my_cloud.state.get('open_bot_trades', []))
@@ -314,6 +363,42 @@ def main():
                     f"Strategy: {my_strategy.name}"
                 )
                 tg_bot.send_msg(status_msg)
+            elif cmd == "help":
+                # 🆘 COMPREHENSIVE HELP REPORT
+                bal = my_cloud.state.get('current_balance', 0)
+                state_label = my_cloud.state.get('status', 'unknown').upper()
+                mode = my_cloud.state.get('mode', 'free').upper()
+                trail = "ON" if my_cloud.state.get('trailing_enabled', True) else "OFF"
+                gemini = "ON" if my_cloud.state.get('ai_consultation_enabled', True) else "OFF"
+
+                strategy_state = my_coach.get_current_strategy_state()
+                coach_benched = list(strategy_state.get("BENCHED_PAIRS", {}).keys())
+                manual_benched = my_cloud.state.get('manually_benched_pairs', [])
+
+                help_msg = (
+                    f"🆘 {BOT_IDENTITY.upper()} MASTER CONTROL\n"
+                    f"-----------------------------\n"
+                    f"📈 STATE: {state_label}\n"
+                    f"💰 BAL: ${bal}\n"
+                    f"🕹️ MODE: {mode}\n"
+                    f"🏃‍♂️ TRAIL: {trail}\n"
+                    f"🤖 AI: {gemini}\n"
+                    f"-----------------------------\n"
+                    f"🚫 COACH BENCH: {', '.join(coach_benched) if coach_benched else 'None'}\n"
+                    f"🔒 MANUAL BENCH: {', '.join([p.upper() for p in manual_benched]) if manual_benched else 'None'}\n"
+                    f"-----------------------------\n"
+                    f"📜 COMMANDS:\n"
+                    f"• /{BOT_IDENTITY}_pause / resume\n"
+                    f"• /{BOT_IDENTITY}_mode (Fixed/Free)\n"
+                    f"• /{BOT_IDENTITY}_manage (Trail ON/OFF)\n"
+                    f"• /{BOT_IDENTITY}_gemini (AI ON/OFF)\n"
+                    f"• /{BOT_IDENTITY}_clear (Clear Coach)\n"
+                    f"• /{BOT_IDENTITY}_{{pair}} (Toggle Perm Bench)\n"
+                    f"• /{BOT_IDENTITY}_coach (Diagnostics)\n"
+                    f"• /{BOT_IDENTITY}_consult (Force AI)\n"
+                    f"• /help (Global State)"
+                )
+                tg_bot.send_msg(help_msg)
             elif cmd == "coach":
                 # 🧢 MANUAL DIAGNOSTIC TRIGGER
                 diag_msg = my_coach.diagnose()
@@ -322,6 +407,22 @@ def main():
                 # 🧢 MANUAL FORCE CONSULTATION
                 tg_bot.send_msg("🤖 Force-Consulting the Oracle...")
                 my_coach.consult_oracle(force=True)
+            elif cmd:
+                # 🔍 CHECK IF IT'S A PAIR COMMAND (e.g. /leo_eurusd)
+                potential_pair = cmd.upper()
+                # Use a combined list of default markets and active pairs to validate
+                all_possible_pairs = set(USER_DEFAULT_MARKETS) | set(my_cloud.state.get('active_pairs', []))
+
+                if potential_pair in all_possible_pairs:
+                    manual_benched = my_cloud.state.get('manually_benched_pairs', [])
+                    if potential_pair in manual_benched:
+                        manual_benched.remove(potential_pair)
+                        tg_bot.send_msg(f"🔓 {potential_pair} unbenched from manual list.")
+                    else:
+                        manual_benched.append(potential_pair)
+                        tg_bot.send_msg(f"🔒 {potential_pair} permanently benched.")
+                    my_cloud.state['manually_benched_pairs'] = manual_benched
+                    my_cloud.save_memory()
 
             # Refresh state again after commands in case Coach changed strategy or memory.
             my_cloud.load_memory()
@@ -384,12 +485,18 @@ def main():
 
             # Market Scan
             active_pairs = my_cloud.state.get('active_pairs', [])
+            manual_benched = my_cloud.state.get('manually_benched_pairs', [])
+
             for pair in active_pairs:
                 
                 # 🚫 STRICT FILTER: NO METALS OR CRYPTO
                 # If the pair contains any blacklisted substring, skip it hard.
                 if any(bad in pair for bad in BLACKLIST_ASSETS):
                     # print(f"   🚫 Skipping {pair} (Blacklisted)") # Optional: Uncomment to debug
+                    continue
+
+                # 🔒 MANUAL BENCH CHECK
+                if pair.upper() in manual_benched:
                     continue
 
                 # 🛑 DUPLICATE CHECK
@@ -451,15 +558,30 @@ def main():
                         if result:
                             server_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                             print(f"   ✅ Trade Executed! Ticket: {result.order}")
-                            
-                            # 🛠️ ROUNDING FOR MESSAGE
-                            clean_sl = round(sl, 5)
-                            clean_tp = round(tp, 5)
-                            
-                            tg_bot.send_msg(f"🚀 ENTRY: {pair} {signal}\nSL: {clean_sl}\nTP: {clean_tp}\n🧪 {my_strategy.name}")
 
                             # Capture spread at Open
                             spread_at_open = my_broker.get_spread(pair)
+
+                            # 💸 Calculate Spread in Money
+                            sym_info = mt5.symbol_info(pair)
+                            spread_money = 0
+                            if sym_info:
+                                spread_money = spread_at_open * sym_info.trade_contract_size * volume
+
+                            # 🛠️ ROUNDING FOR MESSAGE
+                            clean_entry = round(result.price, sym_info.digits if sym_info else 5)
+                            clean_sl = round(sl, sym_info.digits if sym_info else 5)
+                            clean_tp = round(tp, sym_info.digits if sym_info else 5)
+
+                            entry_msg = (
+                                f"🚀 ENTRY: {pair} {signal}\n"
+                                f"📍 Price: {clean_entry}\n"
+                                f"🛡️ SL: {clean_sl}\n"
+                                f"🎯 TP: {clean_tp}\n"
+                                f"💸 Spread: ${spread_money:.2f}\n"
+                                f"🧪 {my_strategy.name}"
+                            )
+                            tg_bot.send_msg(entry_msg)
 
                             trade_data = {
                                 'ticket': result.order,
@@ -489,18 +611,21 @@ def main():
                     print(f"   ❌ Error {pair}: {e}")
 
             time.sleep(10)
+            consecutive_errors = 0 # Loop completed successfully
 
         except KeyboardInterrupt:
             print("🛑 Manual Shutdown.")
             break # Exit the loop only on manual command
         except Exception as e:
+            consecutive_errors += 1
             # 🛡️ THE CRASH CATCHER
             error_msg = str(e)
+            mt5_err = mt5.last_error()
 
             # 🚑 MT5 Relaunch Protocol
             if "'NoneType' object is not iterable" in error_msg:
                 print(f"🚑 MT5 RECOVERY: {error_msg}")
-                tg_bot.send_msg(f"🚨 {BOT_IDENTITY.capitalize()} MT5 Connection Lost. Attempting to relaunch terminal...")
+                tg_bot.send_msg(f"🚨 {BOT_IDENTITY.capitalize()} MT5 Connection Lost ({consecutive_errors}/7). Attempting relaunch...")
 
                 # Disconnect before relaunch
                 my_broker.shutdown()
@@ -510,17 +635,19 @@ def main():
                     next_mt5_retry_at = 0
                     tg_bot.send_msg("✅ MT5 Reconnected.")
                 else:
-                    tg_bot.send_msg("❌ MT5 Relaunch FAILED. Check file path. Retrying connection in 5 mins.")
+                    tg_bot.send_msg(f"❌ MT5 Relaunch FAILED ({consecutive_errors}/7). Retrying connection in 5 mins.")
                     next_mt5_retry_at = time.time() + MT5_RETRY_INTERVAL
             else:
                 # Standard crash report
-                print(f"📉 CRITICAL CRASH: {error_msg}")
-                tg_bot.send_msg(f"📉 CRITICAL CRASH: {e}")
+                full_crash_msg = f"📉 CRITICAL CRASH ({consecutive_errors}/7):\n{error_msg}\nMT5 Error: {mt5_err}"
+                print(full_crash_msg)
+                tg_bot.send_msg(full_crash_msg)
+
+            if consecutive_errors >= 7:
+                tg_bot.send_msg(f"💀 FATAL ERROR: {BOT_IDENTITY.upper()} stopped after 7 consecutive failures.")
+                break
 
             time.sleep(10) # Pause for 10s to avoid spamming the logs if it's a persistent error
-
-if __name__ == "__main__":
-    main()
 
 if __name__ == "__main__":
     main()

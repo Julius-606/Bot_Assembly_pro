@@ -12,11 +12,26 @@ from datetime import datetime
 # ==============================================================================
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
 STRATEGY_STATE = {
-    "VERSION": "3.4",
+    "VERSION": "4.0",
     "MENU": [
         "EMA",
         "RSI",
@@ -37,8 +52,8 @@ STRATEGY_STATE = {
         "TRIX"
     ],
     "ACTIVE_CONCOCTION": [
-        "EMA",
-        "Bol"
+        "MACD",
+        "ADX"
     ],
     "PARAMS": {
         "EMA_PERIOD": 20,
@@ -46,7 +61,7 @@ STRATEGY_STATE = {
         "BOL_DEVIATIONS": 2.0,
         "ATR_PERIOD": 20,
         "ATR_MULTIPLIER": 2.0,
-        "RISK_REWARD": 2.0,
+        "RISK_REWARD": 1.5,
         "EMA_FAST": 9,
         "EMA_SLOW": 21,
         "RSI_PERIOD": 14,
@@ -63,7 +78,15 @@ STRATEGY_STATE = {
         "TRIX_PERIOD": 15
     },
     "BENCHED_PAIRS": {
-        "USDJPY": "2026-05-27 22:57:11"
+        "USDJPY": "2026-07-29 20:14:45",
+        "EURJPY": "2026-07-29 20:14:45",
+        "EURAUD": "2026-07-29 20:14:45",
+        "EURGBP": "2026-07-29 20:14:45",
+        "CADJPY": "2026-07-29 20:14:45",
+        "GBPJPY": "2026-07-29 20:14:45",
+        "CHFJPY": "2026-07-29 20:14:45",
+        "AUDJPY": "2026-07-29 20:14:45",
+        "AUDUSD": "2026-07-29 20:14:45"
     },
     "MODE": "STANDARD"
 }

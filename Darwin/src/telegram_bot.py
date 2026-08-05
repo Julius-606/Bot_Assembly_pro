@@ -58,17 +58,19 @@ class TelegramBot:
                     
                     base_cmd = parts[0]
                     
-                    # 1. GLOBAL CALL
+                    # 1. GLOBAL CALLS
                     if base_cmd == "/assemble":
-                        cmd_action = "status"
+                        cmd_action = ("status", [])
+                    elif base_cmd == "/help":
+                        cmd_action = ("help", [])
                     
                     # 2. TARGETED CALL (e.g. /darwin_pause)
                     # We look for the pattern /{identity}_{command}
-                    # Example: /darwin_pause -> we want 'pause'
                     elif base_cmd.startswith(f"/{self.identity}_"):
                          # Remove the prefix "/darwin_" to get the command
                          prefix_len = len(f"/{self.identity}_")
-                         cmd_action = base_cmd[prefix_len:]
+                         action_name = base_cmd[prefix_len:]
+                         cmd_action = (action_name, parts[1:])
             
             return cmd_action
 

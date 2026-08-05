@@ -15,13 +15,6 @@ from config import GEMINI_API_KEYS, WORKSHEET_LOGS, BOT_IDENTITY # 🛠️ Optim
 # 🔇 SILENCE THE GOOGLE WARNING
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-# ==============================================================================
-# 🎮 AI CONTROL MODE
-# ==============================================================================
-# 'FIXED' -> AI CANNOT change 'ACTIVE_CONCOCTION' (Ingredients). Only tunes 'PARAMS'.
-# 'FREE'  -> AI has full control to change 'ACTIVE_CONCOCTION' and 'PARAMS'.
-AI_CONTROL_MODE = "FREE"  # Options: 'FIXED', 'FREE'
-# ==============================================================================
 
 class Coach:
     """
@@ -304,17 +297,24 @@ class Coach:
         """Returns a quick health check string for the user."""
         print("   🧢 Coach: Running Diagnostics (Read-Only)...")
         
-        model_name = self.model_name if self.model else "None"
-        ai_status = f"✅ Online ({model_name} | Key #{self.current_key_index+1})" if self.model else "❌ Offline"
+        # AI Brain Status
+        mode = self.cloud.state.get('mode', 'free').upper()
+        consult_enabled = self.cloud.state.get('ai_consultation_enabled', True)
+        ai_status_icon = "✅" if consult_enabled else "🛑"
+        ai_status = f"{ai_status_icon} {mode} ({self.model_name} | Key #{self.current_key_index+1})" if self.model else "❌ Offline"
         
         state = self.get_current_strategy_state()
         benched = state.get("BENCHED_PAIRS", {})
-        
+        manual_benched = self.cloud.state.get('manually_benched_pairs', [])
+
         bench_msg = ""
-        if benched:
+        if benched or manual_benched:
             bench_msg = "\n🚫 BENCHED PAIRS:\n"
+            for pair in manual_benched:
+                bench_msg += f"   - {pair.upper()} (🔒 PERMANENT)\n"
             for pair, time_str in benched.items():
-                bench_msg += f"   - {pair} until {time_str}\n"
+                if pair not in manual_benched:
+                    bench_msg += f"   - {pair} until {time_str}\n"
         else:
             bench_msg = "\n✅ No pairs currently benched."
 
@@ -323,7 +323,6 @@ class Coach:
         if df is None or df.empty:
             return (f"🧢 COACH DIAGNOSTICS\n"
                     f"🧠 AI Brain: {ai_status}\n"
-                    f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                     f"⚠️ Sheet Status: Connected, but Sheet is EMPTY.")
 
         df.columns = df.columns.str.strip()
@@ -344,7 +343,6 @@ class Coach:
         if closed.empty:
              return (f"🧢 COACH DIAGNOSTICS\n"
                     f"🧠 AI Brain: {ai_status}\n"
-                    f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                     f"⚠️ Data Status: No CLOSED trades found.\n"
                     f"{bench_msg}")
 
@@ -362,7 +360,6 @@ class Coach:
         
         return (f"🧢 COACH DIAGNOSTICS\n"
                 f"🧠 AI Brain: {ai_status}\n"
-                f"🎮 Control Mode: {AI_CONTROL_MODE}\n"
                 f"📊 Batch Progress: {remainder}/20 collected\n"
                 f"⏳ Next Review: In {trades_needed} trades\n"
                 f"📜 Total History: {count} closed trades\n"
@@ -392,6 +389,10 @@ class Coach:
         state = self.get_current_strategy_state()
         current_benched = state.get("BENCHED_PAIRS", {})
         
+        # AMNESIA FIX: Track when benches were lifted
+        lifted_at = self.cloud.state.get('lifted_at', {})
+        dirty_cloud = False
+
         dirty = False
         new_bench_state = current_benched.copy()
 
@@ -403,7 +404,9 @@ class Coach:
                 if now > lift_time:
                     print(f"   🔓 Lifting bench for {p}.")
                     del new_bench_state[p]
+                    lifted_at[p] = now.strftime("%Y-%m-%d %H:%M:%S")
                     dirty = True
+                    dirty_cloud = True
             except:
                 del new_bench_state[p]
                 dirty = True
@@ -412,8 +415,15 @@ class Coach:
         for pair in pairs:
             if pair in new_bench_state: continue
 
+            pair_df = df[df['Pair'] == pair]
+
+            # AMNESIA FIX: Filter out trades seen BEFORE the last lift
+            if pair in lifted_at and time_col:
+                last_lift = pd.to_datetime(lifted_at[pair])
+                pair_df = pair_df[pair_df[time_col] > last_lift]
+
             # .tail() now explicitly grabs the NEWEST rows because we sorted above
-            pair_data = df[df['Pair'] == pair].tail(self.lookback_trades)
+            pair_data = pair_df.tail(self.lookback_trades)
             if len(pair_data) < 3: continue 
             
             wins = len(pair_data[pair_data['PnL'] > 0])
@@ -432,6 +442,10 @@ class Coach:
             full_state = state.copy()
             full_state["BENCHED_PAIRS"] = new_bench_state
             self._update_strategy_file(full_state)
+
+        if dirty_cloud:
+            self.cloud.state['lifted_at'] = lifted_at
+            self.cloud.save_memory()
 
     def check_activity(self):
         """Checks if bot is too silent."""
@@ -490,6 +504,10 @@ class Coach:
 
     def consult_oracle(self, force=False):
         """The AI Brain with Key Rotation."""
+        if not self.cloud.state.get('ai_consultation_enabled', True):
+            if force: self.bot.send_msg("🛑 Gemini Consultation is DISABLED.")
+            return
+
         closed_df = self.audit_performance()
         if closed_df is None or closed_df.empty: 
             if force: self.bot.send_msg("⚠️ Consult failed: No closed trades found to analyze.")
@@ -530,7 +548,8 @@ class Coach:
         current_strategy = json.dumps(state, indent=2)
         
         # 🎮 AI CONTROL MODE LOGIC
-        if AI_CONTROL_MODE == "FIXED":
+        mode = self.cloud.state.get('mode', 'free').upper()
+        if mode == "FIXED":
             task_instruction = (
                 "TASK: Bot is underperforming. Optimize 'PARAMS' ONLY.\n"
                 "1. DO NOT CHANGE 'ACTIVE_CONCOCTION'. Keep it EXACTLY as is.\n"
@@ -546,10 +565,13 @@ class Coach:
 
         prompt = f"""
         You are an expert Forex Algorithmic Trading Coach.
-        BOT CONTEXT: {BOT_IDENTITY.capitalize()} manages live trades, and TP_CHASE can cause repeated SL_HIT rows in Sheets.
+        BOT CONTEXT: {BOT_IDENTITY.capitalize()} manages live trades with AGGRESSIVE TRAILING logic.
+        ⚠️ CRITICAL NOTE: Many 'SL_HIT' entries in the history are actually POSITIVE or BREAK-EVEN exits where the Trailing Stop Loss successfully locked in profit.
+        Analyze the 'PnL' column carefully; do not assume 'SL_HIT' means a bad strategy call if the PnL is positive or near-zero.
+
         CURRENT STRATEGY STATE: {current_strategy}
         RECENT HISTORY: {recent_history_json}
-        CONTROL MODE: {AI_CONTROL_MODE}
+        CONTROL MODE: {mode}
         
         {task_instruction}
         

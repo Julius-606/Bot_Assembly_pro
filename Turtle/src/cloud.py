@@ -37,7 +37,12 @@ class CloudManager:
             "open_bot_trades": [], 
             "trade_history": [],
             "last_update_id": 0,
-            "ai_change_pending": False
+            "ai_change_pending": False,
+            "mode": "free",
+            "trailing_enabled": True,
+            "ai_consultation_enabled": True,
+            "manually_benched_pairs": [],
+            "lifted_at": {}
         }
         
         self.setup()

@@ -12,6 +12,11 @@ from datetime import datetime
 # ==============================================================================
 
 
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -61,8 +66,9 @@ STRATEGY_STATE = {
         "TRIX_PERIOD": 15
     },
     "BENCHED_PAIRS": {
-        "EURJPY": "2026-07-25 17:06:44",
-        "USDJPY": "2026-07-25 17:06:44"
+        "EURUSD": "2026-07-31 17:49:19",
+        "EURJPY": "2026-07-31 17:49:19",
+        "USDJPY": "2026-07-31 17:49:19"
     },
     "MODE": "STANDARD"
 }

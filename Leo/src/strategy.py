@@ -34,6 +34,15 @@ from datetime import datetime
 
 
 
+
+
+
+
+
+
+
+
+
 # 🧠 AI EXCLUSIVE ZONE (Gemini edits this via Coach)
 # The Coach (coach.py) uses Regex to surgically update this block.
 # ==============================================================================
@@ -65,10 +74,10 @@ STRATEGY_STATE = {
     "PARAMS": {
         "EMA_PERIOD": 20,
         "BOL_PERIOD": 20,
-        "BOL_DEVIATIONS": 2.0,
+        "BOL_DEVIATIONS": 2.25,
         "ATR_PERIOD": 20,
-        "ATR_MULTIPLIER": 2.0,
-        "RISK_REWARD": 2.0,
+        "ATR_MULTIPLIER": 2.5,
+        "RISK_REWARD": 1.5,
         "EMA_FAST": 12,
         "EMA_SLOW": 26,
         "RSI_PERIOD": 14,
@@ -84,16 +93,7 @@ STRATEGY_STATE = {
         "ROC_PERIOD": 12,
         "TRIX_PERIOD": 15
     },
-    "BENCHED_PAIRS": {
-        "CADJPY": "2026-07-30 19:22:43",
-        "GBPJPY": "2026-07-30 19:22:43",
-        "CHFJPY": "2026-07-30 19:38:48",
-        "AUDJPY": "2026-07-30 20:33:34",
-        "USDJPY": "2026-07-30 20:33:34",
-        "AUDUSD": "2026-07-30 20:33:34",
-        "EURGBP": "2026-07-30 20:33:34",
-        "EURJPY": "2026-07-30 20:33:34"
-    },
+    "BENCHED_PAIRS": {},
     "MODE": "STANDARD"
 }
 # ==============================================================================
